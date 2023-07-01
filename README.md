@@ -122,7 +122,7 @@ Ping all IP addresses in the subnet range 172.17.0.0/24:
 subping -t 300ms -c 3 -n 100 172.17.0.0/24
 ```
 
-![](docs/images/usage-example.png?raw=true)
+![](assets/images/usage-example.png?raw=true)
 
 ## Contributing
 
