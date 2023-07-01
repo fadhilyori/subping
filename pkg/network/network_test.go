@@ -49,3 +49,15 @@ func TestGenerateIPListFromCIDR30(t *testing.T) {
 		t.Errorf("Generated IP list contains invalid IPs.\nInvalid IPs: %v\nGot: %v", checkResult, result)
 	}
 }
+
+func TestGenerateIPListFromCIDR24(t *testing.T) {
+	ip := net.ParseIP("10.10.0.1")
+	_, cidr, _ := net.ParseCIDR("10.10.0.0/24")
+
+	result := GenerateIPListFromCIDR(ip, cidr)
+
+	checkResult := FindIPsOutsideSubnet(result, cidr)
+	if len(checkResult) != 0 {
+		t.Errorf("Generated IP list contains invalid IPs.\nInvalid IPs: %v\nGot: %v", checkResult, result)
+	}
+}
