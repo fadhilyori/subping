@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fadhilyori/subping/pkg/network"
 	"github.com/go-ping/ping"
 	_ "go.uber.org/automaxprocs"
 )
@@ -18,8 +19,8 @@ var (
 	wg sync.WaitGroup
 )
 
-func doPing(ipAddress string, count int, timeout time.Duration) *ping.Statistics {
-	pinger, err := ping.NewPinger(ipAddress)
+func doPing(ipAddress net.IP, count int, timeout time.Duration) *ping.Statistics {
+	pinger, err := ping.NewPinger(ipAddress.String())
 	if err != nil {
 		log.Printf("Failed to create pinger for IP Address: %s\n", ipAddress)
 		return nil
@@ -35,20 +36,11 @@ func doPing(ipAddress string, count int, timeout time.Duration) *ping.Statistics
 	return pinger.Statistics()
 }
 
-func inc(ip net.IP) {
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-		if ip[j] > 0 {
-			break
-		}
-	}
-}
-
-func partitionStrings(arr []string, numPartitions int) [][]string {
+func partitionSlice(arr []net.IP, numPartitions int) [][]net.IP {
 	arrSize := len(arr)
 	chunkSize := int(math.Ceil(float64(arrSize) / float64(numPartitions)))
 
-	var result [][]string
+	var result [][]net.IP
 
 	for i := 0; i < arrSize; i += chunkSize {
 		end := i + chunkSize
@@ -62,26 +54,14 @@ func partitionStrings(arr []string, numPartitions int) [][]string {
 	return result
 }
 
-func getIPList(subnet string) []string {
-	var ips []string
-	ip, ipNet, err := net.ParseCIDR(subnet)
-	if err != nil {
-		fmt.Printf("Failed to parse subnet: %v\n", err)
-		return []string{}
-	}
-
-	for ip := ip.Mask(ipNet.Mask); ipNet.Contains(ip); inc(ip) {
-		ips = append(ips, ip.String())
-	}
-
-	return ips
-}
-
 func main() {
 	subnetString := os.Args[1]
-	ips := getIPList(subnetString)
+	ips, err := network.GenerateIPListFromCIDRString(subnetString)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
 	workersCount := runtime.NumCPU()
-	ipsSplit := partitionStrings(ips, workersCount)
+	ipsSplit := partitionSlice(ips, workersCount)
 
 	fmt.Printf("Network\t\t\t: %s\n", subnetString)
 	fmt.Printf("IP addresses ranges\t: %v - %v\n", ips[0], ips[len(ips)-1])
