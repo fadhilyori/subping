@@ -118,7 +118,7 @@ func (s *Subping) GetOnlineHosts() map[string]*ping.Statistics {
 	r := make(map[string]*ping.Statistics)
 
 	for ip, stats := range s.results {
-		if stats.PacketsRecv > 0 {
+		if stats != nil && stats.PacketsRecv > 0 {
 			r[ip] = stats
 		}
 	}
