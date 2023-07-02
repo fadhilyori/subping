@@ -54,8 +54,8 @@ To use the Subping library, follow these steps:
 
 ```go
 import (
-    "github.com/your-username/subping"
-    "github.com/your-username/subping/pkg/network"
+    "github.com/fadhilyori/subping"
+    "github.com/fadhilyori/subping/pkg/network"
 )
 ```
 
