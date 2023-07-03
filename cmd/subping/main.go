@@ -66,9 +66,9 @@ func main() {
 	fmt.Printf("Network\t\t: %s\n", subnetString)
 	fmt.Printf("IP Ranges\t: %v - %v\n", ips[0], ips[len(ips)-1])
 	fmt.Printf("Total hosts\t: %d\n", len(ips))
-	fmt.Println("-------------------------------------")
-	fmt.Println("| IP Address      | Avg Latency     |")
-	fmt.Println("-------------------------------------")
+	fmt.Println("---------------------------------------")
+	fmt.Println("| IP Address       | Avg Latency      |")
+	fmt.Println("---------------------------------------")
 	fmt.Printf("Pinging...")
 
 	s.Run()
@@ -96,7 +96,7 @@ func main() {
 		fmt.Printf("| %-15s | %-15s |\n", ipString, stats.AvgRtt.String())
 	}
 
-	fmt.Println("-------------------------------------")
+	fmt.Println("---------------------------------------")
 
 	elapsed := time.Since(startTime)
 	fmt.Printf("Execution time: %s\n", elapsed.String())
