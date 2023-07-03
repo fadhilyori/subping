@@ -187,6 +187,7 @@ func TestSubping_GetOnlineHosts(t *testing.T) {
 		targets  []net.IP
 		count    int
 		interval time.Duration
+		timeout  time.Duration
 		numJobs  int
 		results  map[string]*ping.Statistics
 	}
@@ -207,6 +208,7 @@ func TestSubping_GetOnlineHosts(t *testing.T) {
 				targets:  targetsLocalWithSubnet27,
 				count:    3,
 				interval: 300 * time.Millisecond,
+				timeout:  1 * time.Second,
 				numJobs:  2,
 			},
 		},
@@ -216,17 +218,22 @@ func TestSubping_GetOnlineHosts(t *testing.T) {
 				targets:  targetsLocalWithSubnet27,
 				count:    3,
 				interval: 300 * time.Millisecond,
+				timeout:  1 * time.Second,
 				numJobs:  20,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &subping.Subping{
+			s, err := subping.NewSubping(&subping.Options{
 				Targets:  tt.fields.targets,
 				Count:    tt.fields.count,
 				Interval: tt.fields.interval,
+				Timeout:  tt.fields.timeout,
 				NumJobs:  tt.fields.numJobs,
+			})
+			if err != nil {
+				t.Errorf("GetOnlineHosts() error = %v\n", err)
 			}
 
 			s.Run()
@@ -283,13 +290,17 @@ func TestSubping_Run(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, _ := subping.NewSubping(&subping.Options{
+			s, err := subping.NewSubping(&subping.Options{
 				Targets:  tt.fields.targets,
 				Count:    tt.fields.count,
 				Interval: tt.fields.interval,
 				Timeout:  tt.fields.timeout,
 				NumJobs:  tt.fields.numJobs,
 			})
+			if err != nil {
+				t.Errorf("Run() error = %v", err)
+			}
+
 			s.Run()
 
 			lenOfResults := len(s.Results)
