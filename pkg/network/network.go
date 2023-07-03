@@ -36,7 +36,7 @@ func GenerateIPListFromCIDRString(cidr string) ([]net.IP, error) {
 func GenerateIPListFromCIDR(firstIp net.IP, cidr *net.IPNet) []net.IP {
 	var ips []net.IP
 
-	for ip := firstIp; cidr.Contains(ip); inc(ip) {
+	for ip := firstIp.Mask(cidr.Mask); cidr.Contains(ip); inc(ip) {
 		newIP := make(net.IP, len(ip))
 		copy(newIP, ip)
 		ips = append(ips, newIP)
