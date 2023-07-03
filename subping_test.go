@@ -38,6 +38,7 @@ func TestNewSubping(t *testing.T) {
 				opts: &subping.Options{
 					Targets:  targetsLocalWithSubnet29,
 					Count:    3,
+					Timeout:  1 * time.Second,
 					Interval: 300 * time.Millisecond,
 					NumJobs:  2,
 				},
@@ -45,9 +46,9 @@ func TestNewSubping(t *testing.T) {
 			want: subping.Subping{
 				Targets:  targetsLocalWithSubnet29,
 				Count:    3,
+				Timeout:  1 * time.Second,
 				Interval: 300 * time.Millisecond,
 				NumJobs:  2,
-				Results:  nil,
 			},
 			wantErr: false,
 		},
@@ -57,6 +58,7 @@ func TestNewSubping(t *testing.T) {
 				opts: &subping.Options{
 					Targets:  targetsLocalWithSubnet29,
 					Count:    -1,
+					Timeout:  1 * time.Second,
 					Interval: 300 * time.Millisecond,
 					NumJobs:  2,
 				},
@@ -64,9 +66,9 @@ func TestNewSubping(t *testing.T) {
 			want: subping.Subping{
 				Targets:  nil,
 				Count:    0,
+				Timeout:  0,
 				Interval: 0,
 				NumJobs:  0,
-				Results:  nil,
 			},
 			wantErr: true,
 		},
@@ -85,7 +87,6 @@ func TestNewSubping(t *testing.T) {
 				Count:    0,
 				Interval: 0,
 				NumJobs:  0,
-				Results:  nil,
 			},
 			wantErr: true,
 		},
@@ -97,8 +98,25 @@ func TestNewSubping(t *testing.T) {
 				t.Errorf("NewSubping() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewSubping() got = %v, want %v", got, tt.want)
+
+			if !reflect.DeepEqual(got.Targets, tt.want.Targets) {
+				t.Errorf("NewSubping() Targets got = %v, want %v", got, tt.want)
+			}
+
+			if got.Count != tt.want.Count {
+				t.Errorf("NewSubping() Count got = %v, want %v", got, tt.want)
+			}
+
+			if got.Timeout != tt.want.Timeout {
+				t.Errorf("NewSubping() Timeout got = %v, want %v", got, tt.want)
+			}
+
+			if got.Interval != tt.want.Interval {
+				t.Errorf("NewSubping() Interval got = %v, want %v", got, tt.want)
+			}
+
+			if got.NumJobs != tt.want.NumJobs {
+				t.Errorf("NewSubping() NumJobs got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -235,6 +253,7 @@ func TestSubping_Run(t *testing.T) {
 		targets  []net.IP
 		count    int
 		interval time.Duration
+		timeout  time.Duration
 		numJobs  int
 	}
 	tests := []struct {
@@ -247,6 +266,7 @@ func TestSubping_Run(t *testing.T) {
 				targets:  targetsLocalWithSubnet27,
 				count:    3,
 				interval: 300 * time.Millisecond,
+				timeout:  1 * time.Second,
 				numJobs:  2,
 			},
 		},
@@ -256,18 +276,20 @@ func TestSubping_Run(t *testing.T) {
 				targets:  targetsLocalWithSubnet27,
 				count:    3,
 				interval: 300 * time.Millisecond,
+				timeout:  1 * time.Second,
 				numJobs:  50,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := &subping.Subping{
+			s, _ := subping.NewSubping(&subping.Options{
 				Targets:  tt.fields.targets,
 				Count:    tt.fields.count,
 				Interval: tt.fields.interval,
+				Timeout:  tt.fields.timeout,
 				NumJobs:  tt.fields.numJobs,
-			}
+			})
 			s.Run()
 
 			lenOfResults := len(s.Results)
