@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"runtime"
+	"net"
 	"sort"
 	"time"
 
@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	pingCount      int
-	pingTimeoutStr string
-	pingNumJobs    int
-	subpingVersion string = "latest"
+	pingCount           int
+	pingTimeoutStr      string
+	pingIntervalStr     string
+	pingNumJobs         int
+	subpingVersion      = "latest"
+	showOfflineHostList bool
 )
 
 func main() {
@@ -36,16 +38,22 @@ func main() {
 
 	flags := rootCmd.Flags()
 
-	flags.IntVarP(&pingCount, "count", "c", 3,
+	flags.IntVarP(&pingCount, "count", "c", 1,
 		"Specifies the number of ping attempts for each IP address.",
 	)
 	flags.IntVarP(&pingNumJobs,
-		"job", "n", runtime.NumCPU(),
+		"job", "n", 128,
 		"Specifies the number of maximum concurrent jobs spawned to perform ping operations."+
 			"\nThe default value is equal to the number of CPUs available on the system.",
 	)
-	flags.StringVarP(&pingTimeoutStr, "timeout", "t", "300ms",
-		"Specifies the maximum ping timeout duration. The default value is \"300ms\".",
+	flags.StringVarP(&pingTimeoutStr, "timeout", "t", "80ms",
+		"Specifies the maximum ping timeout duration for each ping request.",
+	)
+	flags.StringVarP(&pingIntervalStr, "interval", "i", "300ms",
+		"Specifies the time duration between each ping request.",
+	)
+	flags.BoolVar(&showOfflineHostList, "offline", false,
+		"Specify whether to display the list of offline hosts.",
 	)
 
 	if err := rootCmd.Execute(); err != nil {
@@ -63,24 +71,38 @@ func runSubping(cmd *cobra.Command, args []string) {
 		log.Fatal(err.Error())
 	}
 
+	pingInterval, err := time.ParseDuration(pingIntervalStr)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	ips, err := network.GenerateIPListFromCIDRString(subnetString)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
+	totalHost := len(ips)
+
 	s, err := subping.NewSubping(&subping.Options{
-		Targets: ips,
-		Count:   pingCount,
-		Timeout: pingTimeout,
-		NumJobs: pingNumJobs,
+		Targets:  ips,
+		Count:    pingCount,
+		Interval: pingInterval,
+		Timeout:  pingTimeout * time.Duration(pingCount),
+		NumJobs:  pingNumJobs,
 	})
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	fmt.Printf("Network\t\t: %s\n", subnetString)
-	fmt.Printf("IP Ranges\t: %v - %v\n", ips[0], ips[len(ips)-1])
-	fmt.Printf("Total hosts\t: %d\n", len(ips))
+	_, cidr, err := net.ParseCIDR(subnetString)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	fmt.Printf("Network        : %s\n", cidr.String())
+	fmt.Printf("IP Ranges      : %s - %s\n", ips[0].String(), ips[len(ips)-1].String())
+	fmt.Printf("Total hosts    : %d\n", totalHost)
+	fmt.Printf("Num of workers : %d\n", len(s.PartitionedTargets))
 	fmt.Println(`---------------------------------------`)
 	fmt.Println("| IP Address       | Avg Latency      |")
 	fmt.Println(`---------------------------------------`)
@@ -109,6 +131,20 @@ func runSubping(cmd *cobra.Command, args []string) {
 
 	fmt.Println(`---------------------------------------`)
 
+	if showOfflineHostList {
+		fmt.Println("Offline hosts :")
+		for ip, stats := range s.Results {
+			if stats.PacketsRecv == 0 {
+				fmt.Printf(" - %s\n", ip)
+			}
+		}
+	}
+
 	elapsed := time.Since(startTime)
-	fmt.Printf("Execution time: %s\n", elapsed.String())
+	totalHostOnline := len(results)
+	totalHostOffline := totalHost - totalHostOnline
+
+	fmt.Printf("\nTotal Hosts Online  : %d\n", totalHostOnline)
+	fmt.Printf("Total Hosts Offline : %d\n", totalHostOffline)
+	fmt.Printf("Execution time      : %s\n\n", elapsed.String())
 }
