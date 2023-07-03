@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"runtime"
 	"sort"
@@ -64,9 +66,9 @@ func main() {
 	fmt.Printf("Network\t\t: %s\n", subnetString)
 	fmt.Printf("IP Ranges\t: %v - %v\n", ips[0], ips[len(ips)-1])
 	fmt.Printf("Total hosts\t: %d\n", len(ips))
-	fmt.Println("---------------------------------------")
-	fmt.Println("| IP Address       | Avg Latency      |")
-	fmt.Println("---------------------------------------")
+	fmt.Println("-------------------------------------")
+	fmt.Println("| IP Address      | Avg Latency     |")
+	fmt.Println("-------------------------------------")
 	fmt.Printf("Pinging...")
 
 	s.Run()
@@ -74,23 +76,27 @@ func main() {
 	results := s.GetOnlineHosts()
 
 	// Extract keys into a slice
-	keys := make([]string, 0, len(results))
+	keys := make([]net.IP, 0, len(results))
 	for key := range results {
-		keys = append(keys, key)
+		keys = append(keys, net.ParseIP(key))
 	}
 
-	// Sort the keys
-	sort.Strings(keys)
+	// Sort the keys Based on byte comparison
+	sort.Slice(keys, func(i, j int) bool {
+		return bytes.Compare(keys[i].To4(), keys[j].To4()) < 0
+	})
 
 	fmt.Print("\r")
 
 	for _, ip := range keys {
-		stats := results[ip]
+		// convert bytes to string in each line of IP
+		ipString := ip.String()
+		stats := results[ipString]
 
-		fmt.Printf("| %-16s | %-16s |\n", ip, stats.AvgRtt.String())
+		fmt.Printf("| %-15s | %-15s |\n", ipString, stats.AvgRtt.String())
 	}
 
-	fmt.Println("---------------------------------------")
+	fmt.Println("-------------------------------------")
 
 	elapsed := time.Since(startTime)
 	fmt.Printf("Execution time: %s\n", elapsed.String())
