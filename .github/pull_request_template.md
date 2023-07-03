@@ -1,12 +1,3 @@
----
-name: Pull request
-about: Changes or fix that will be applied in this project
-title: ''
-labels: 
-assignees: ''
-
----
-
 ## Pull Request Description
 
 **What does this PR do?**  
