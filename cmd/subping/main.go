@@ -93,7 +93,7 @@ func main() {
 		ipString := ip.String()
 		stats := results[ipString]
 
-		fmt.Printf("| %-15s | %-15s |\n", ipString, stats.AvgRtt.String())
+		fmt.Printf("| %-16s | %-16s |\n", ipString, stats.AvgRtt.String())
 	}
 
 	fmt.Println("---------------------------------------")
