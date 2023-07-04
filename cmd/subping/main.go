@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"net"
@@ -112,20 +113,24 @@ func runSubping(cmd *cobra.Command, args []string) {
 	results := s.GetOnlineHosts()
 
 	// Extract keys into a slice
-	keys := make([]string, 0, len(results))
+	keys := make([]net.IP, 0, len(results))
 	for key := range results {
-		keys = append(keys, key)
+		keys = append(keys, net.ParseIP(key))
 	}
 
-	// Sort the keys
-	sort.Strings(keys)
+	// Sort the keys Based on byte comparison
+	sort.Slice(keys, func(i, j int) bool {
+		return bytes.Compare(keys[i].To4(), keys[j].To4()) < 0
+	})
 
 	fmt.Print("\r")
 
 	for _, ip := range keys {
-		stats := results[ip]
+		// convert bytes to string in each line of IP
+		ipString := ip.String()
+		stats := results[ipString]
 
-		fmt.Printf("| %-16s | %-16s |\n", ip, stats.AvgRtt.String())
+		fmt.Printf("| %-16s | %-16s |\n", ipString, stats.AvgRtt.String())
 	}
 
 	fmt.Println(`---------------------------------------`)
