@@ -11,22 +11,28 @@ import (
 	"github.com/go-ping/ping"
 )
 
-// Subping is a utility for concurrently pinging multiple IP addresses and collecting the results.
+// Subping is a utility for concurrently pinging multiple IP addresses and collecting the Results.
 type Subping struct {
 	// List of IP addresses to ping
-	targets []net.IP
+	Targets []net.IP
 
 	// Number of ping packets to send
-	count int
+	Count int
 
-	// Timeout for each ping request
-	timeout time.Duration
+	// Interval for each ping request
+	Interval time.Duration
+
+	// Timeout specifies a timeout before exits each target
+	Timeout time.Duration
 
 	// Number of concurrent jobs to execute
-	numJobs int
+	NumJobs int
 
 	// Results of the ping requests
-	results map[string]*ping.Statistics
+	Results map[string]ping.Statistics
+
+	// PartitionedTargets List of IP addresses that have already been partitioned for pinging.
+	PartitionedTargets [][]net.IP
 }
 
 // Options holds the configuration options for creating a new Subping instance.
@@ -37,7 +43,10 @@ type Options struct {
 	// Number of ping packets to send
 	Count int
 
-	// Timeout for each ping request
+	// Interval for each ping request
+	Interval time.Duration
+
+	// Timeout specifies a timeout before exits each target
 	Timeout time.Duration
 
 	// Number of concurrent jobs to execute
@@ -58,11 +67,15 @@ func NewSubping(opts *Options) (Subping, error) {
 		return Subping{}, errors.New("number of jobs should be more than zero (0)")
 	}
 
+	partitionedSlice := partitionSlice(opts.Targets, opts.NumJobs)
+
 	return Subping{
-		targets: opts.Targets,
-		count:   opts.Count,
-		timeout: opts.Timeout,
-		numJobs: opts.NumJobs,
+		Targets:            opts.Targets,
+		Count:              opts.Count,
+		Interval:           opts.Interval,
+		Timeout:            opts.Timeout,
+		NumJobs:            opts.NumJobs,
+		PartitionedTargets: partitionedSlice,
 	}, nil
 }
 
@@ -70,32 +83,31 @@ func NewSubping(opts *Options) (Subping, error) {
 func (s *Subping) Run() {
 	var (
 		wg                  sync.WaitGroup
-		resultsFromRoutines []map[string]*ping.Statistics
+		resultsFromRoutines []map[string]ping.Statistics
 	)
-	splitedIPList := partitionSlice(s.targets, s.numJobs)
 
 	startJob := func(targets []net.IP) {
 		defer wg.Done()
 
-		result := make(map[string]*ping.Statistics)
+		result := make(map[string]ping.Statistics)
 
 		for _, target := range targets {
-			p := RunPing(target, s.count, s.timeout)
+			p := RunPing(target.String(), s.Count, s.Interval, s.Timeout)
 			result[target.String()] = p
 		}
 
 		resultsFromRoutines = append(resultsFromRoutines, result)
 	}
 
-	for _, job := range splitedIPList {
+	for _, job := range s.PartitionedTargets {
 		wg.Add(1)
 		go startJob(job)
 	}
 
 	wg.Wait()
 
-	s.results = func(s []map[string]*ping.Statistics) map[string]*ping.Statistics {
-		flattened := make(map[string]*ping.Statistics)
+	s.Results = func(s []map[string]ping.Statistics) map[string]ping.Statistics {
+		flattened := make(map[string]ping.Statistics)
 
 		// Flatten the slice into a map
 		for _, m := range s {
@@ -108,17 +120,12 @@ func (s *Subping) Run() {
 	}(resultsFromRoutines)
 }
 
-// GetResults returns the results of the ping requests for all IP addresses.
-func (s *Subping) GetResults() map[string]*ping.Statistics {
-	return s.results
-}
+// GetOnlineHosts returns the Results of the ping requests for IP addresses that responded successfully.
+func (s *Subping) GetOnlineHosts() map[string]ping.Statistics {
+	r := make(map[string]ping.Statistics)
 
-// GetOnlineHosts returns the results of the ping requests for IP addresses that responded successfully.
-func (s *Subping) GetOnlineHosts() map[string]*ping.Statistics {
-	r := make(map[string]*ping.Statistics)
-
-	for ip, stats := range s.results {
-		if stats != nil && stats.PacketsRecv > 0 {
+	for ip, stats := range s.Results {
+		if stats.PacketsRecv > 0 {
 			r[ip] = stats
 		}
 	}
@@ -127,21 +134,26 @@ func (s *Subping) GetOnlineHosts() map[string]*ping.Statistics {
 }
 
 // RunPing sends ICMP echo requests to the specified IP address and returns the ping statistics.
-func RunPing(ipAddress net.IP, count int, timeout time.Duration) *ping.Statistics {
-	pinger, err := ping.NewPinger(ipAddress.String())
+func RunPing(ipAddress string, count int, interval time.Duration, timeout time.Duration) ping.Statistics {
+	pinger, err := ping.NewPinger(ipAddress)
 	if err != nil {
 		log.Printf("Failed to create pinger for IP Address: %s\n", ipAddress)
-		return nil
+		return ping.Statistics{}
 	}
 
 	pinger.Count = count
-	pinger.Timeout = timeout
-	err = pinger.Run()
-	if err != nil {
-		return nil
+	pinger.Interval = interval
+
+	if timeout > 0 {
+		pinger.Timeout = timeout
 	}
 
-	return pinger.Statistics()
+	err = pinger.Run()
+	if err != nil {
+		return ping.Statistics{}
+	}
+
+	return *pinger.Statistics()
 }
 
 // partitionSlice partitions a slice of IP addresses into smaller chunks.

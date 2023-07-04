@@ -8,12 +8,11 @@ import "github.com/fadhilyori/subping"
 
 ## Index
 
-- [func RunPing\(ipAddress net.IP, count int, timeout time.Duration\) \*ping.Statistics](<#RunPing>)
+- [func RunPing\(ipAddress string, count int, interval time.Duration, timeout time.Duration\) ping.Statistics](<#RunPing>)
 - [type Options](<#Options>)
 - [type Subping](<#Subping>)
   - [func NewSubping\(opts \*Options\) \(Subping, error\)](<#NewSubping>)
-  - [func \(s \*Subping\) GetOnlineHosts\(\) map\[string\]\*ping.Statistics](<#Subping.GetOnlineHosts>)
-  - [func \(s \*Subping\) GetResults\(\) map\[string\]\*ping.Statistics](<#Subping.GetResults>)
+  - [func \(s \*Subping\) GetOnlineHosts\(\) map\[string\]ping.Statistics](<#Subping.GetOnlineHosts>)
   - [func \(s \*Subping\) Run\(\)](<#Subping.Run>)
 
 
@@ -21,7 +20,7 @@ import "github.com/fadhilyori/subping"
 ## func RunPing
 
 ```go
-func RunPing(ipAddress net.IP, count int, timeout time.Duration) *ping.Statistics
+func RunPing(ipAddress string, count int, interval time.Duration, timeout time.Duration) ping.Statistics
 ```
 
 RunPing sends ICMP echo requests to the specified IP address and returns the ping statistics.
@@ -39,7 +38,10 @@ type Options struct {
     // Number of ping packets to send
     Count int
 
-    // Timeout for each ping request
+    // Interval for each ping request
+    Interval time.Duration
+
+    // Timeout specifies a timeout before exits each target
     Timeout time.Duration
 
     // Number of concurrent jobs to execute
@@ -50,11 +52,30 @@ type Options struct {
 <a name="Subping"></a>
 ## type Subping
 
-Subping is a utility for concurrently pinging multiple IP addresses and collecting the results.
+Subping is a utility for concurrently pinging multiple IP addresses and collecting the Results.
 
 ```go
 type Subping struct {
-    // contains filtered or unexported fields
+    // List of IP addresses to ping
+    Targets []net.IP
+
+    // Number of ping packets to send
+    Count int
+
+    // Interval for each ping request
+    Interval time.Duration
+
+    // Timeout specifies a timeout before exits each target
+    Timeout time.Duration
+
+    // Number of concurrent jobs to execute
+    NumJobs int
+
+    // Results of the ping requests
+    Results map[string]ping.Statistics
+
+    // PartitionedTargets List of IP addresses that have already been partitioned for pinging.
+    PartitionedTargets [][]net.IP
 }
 ```
 
@@ -71,19 +92,10 @@ NewSubping creates a new Subping instance with the provided options.
 ### func \(\*Subping\) GetOnlineHosts
 
 ```go
-func (s *Subping) GetOnlineHosts() map[string]*ping.Statistics
+func (s *Subping) GetOnlineHosts() map[string]ping.Statistics
 ```
 
-GetOnlineHosts returns the results of the ping requests for IP addresses that responded successfully.
-
-<a name="Subping.GetResults"></a>
-### func \(\*Subping\) GetResults
-
-```go
-func (s *Subping) GetResults() map[string]*ping.Statistics
-```
-
-GetResults returns the results of the ping requests for all IP addresses.
+GetOnlineHosts returns the Results of the ping requests for IP addresses that responded successfully.
 
 <a name="Subping.Run"></a>
 ### func \(\*Subping\) Run

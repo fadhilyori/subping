@@ -23,20 +23,23 @@ func FindIPsOutsideSubnet(ipAddresses []net.IP, subnet *net.IPNet) []net.IP {
 // of IP addresses within the specified range.
 // The CIDR string should be in the form "ip/mask", e.g., "192.168.0.0/24".
 func GenerateIPListFromCIDRString(cidr string) ([]net.IP, error) {
-	ip, ipNet, err := net.ParseCIDR(cidr)
+	_, ipNet, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return []net.IP{}, errors.New("Failed to parse CIDR notation: %v\n")
 	}
 
-	return GenerateIPListFromCIDR(ip, ipNet), nil
+	return GenerateIPListFromCIDR(ipNet), nil
 }
 
 // GenerateIPListFromCIDR generates a list of IP addresses within the specified range
-// based on the given IP and CIDR notation.
-func GenerateIPListFromCIDR(firstIp net.IP, cidr *net.IPNet) []net.IP {
+// based on the given CIDR notation.
+func GenerateIPListFromCIDR(cidr *net.IPNet) []net.IP {
 	var ips []net.IP
 
-	for ip := firstIp; cidr.Contains(ip); inc(ip) {
+	firstIP := make(net.IP, len(cidr.IP))
+	copy(firstIP, cidr.IP)
+
+	for ip := firstIP; cidr.Contains(ip); inc(ip) {
 		newIP := make(net.IP, len(ip))
 		copy(newIP, ip)
 		ips = append(ips, newIP)
