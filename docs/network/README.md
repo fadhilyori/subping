@@ -9,7 +9,7 @@ import "github.com/fadhilyori/subping/pkg/network"
 ## Index
 
 - [func FindIPsOutsideSubnet\(ipAddresses \[\]net.IP, subnet \*net.IPNet\) \[\]net.IP](<#FindIPsOutsideSubnet>)
-- [func GenerateIPListFromCIDR\(firstIp net.IP, cidr \*net.IPNet\) \[\]net.IP](<#GenerateIPListFromCIDR>)
+- [func GenerateIPListFromCIDR\(cidr \*net.IPNet\) \[\]net.IP](<#GenerateIPListFromCIDR>)
 - [func GenerateIPListFromCIDRString\(cidr string\) \(\[\]net.IP, error\)](<#GenerateIPListFromCIDRString>)
 
 
@@ -26,10 +26,10 @@ FindIPsOutsideSubnet returns a list of IP addresses from the given slice that ar
 ## func GenerateIPListFromCIDR
 
 ```go
-func GenerateIPListFromCIDR(firstIp net.IP, cidr *net.IPNet) []net.IP
+func GenerateIPListFromCIDR(cidr *net.IPNet) []net.IP
 ```
 
-GenerateIPListFromCIDR generates a list of IP addresses within the specified range based on the given IP and CIDR notation.
+GenerateIPListFromCIDR generates a list of IP addresses within the specified range based on the given CIDR notation.
 
 <a name="GenerateIPListFromCIDRString"></a>
 ## func GenerateIPListFromCIDRString
