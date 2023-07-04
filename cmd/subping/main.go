@@ -43,8 +43,7 @@ func main() {
 	)
 	flags.IntVarP(&pingNumJobs,
 		"job", "n", 128,
-		"Specifies the number of maximum concurrent jobs spawned to perform ping operations."+
-			"\nThe default value is equal to the number of CPUs available on the system.",
+		"Specifies the number of maximum concurrent jobs spawned to perform ping operations.",
 	)
 	flags.StringVarP(&pingTimeoutStr, "timeout", "t", "80ms",
 		"Specifies the maximum ping timeout duration for each ping request.",
