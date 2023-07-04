@@ -33,18 +33,18 @@ To use subping, follow these steps:
 3. Run the subping command with the specified subnet range:
 
    ```shell
-   subping [OPTIONS] <network subnet>
+   subping [flags] [network subnet]
    ```
 
-   **Options:**
+The following flags are available for the `subping` command:
 
-   `-c <count>`: Specifies the number of ping attempts for each IP address. The default value is 3.
-
-   `-n <numJobs>`: Specifies the number of maximum concurrent jobs spawned to perform ping operations. The default value
-   is equal to the number of CPUs available on the system.
-
-   `-t <timeout>`: Specifies the maximum ping timeout duration. The default value is "300ms". The timeout can be
-   expressed in various units
+- `-c, --count int`: Specifies the number of ping attempts for each IP address. (default 1)
+- `-h, --help`: Displays help information for the `subping` command.
+- `-i, --interval string`: Specifies the time duration between each ping request. (default "300ms")
+- `-n, --job int`: Specifies the number of maximum concurrent jobs spawned to perform ping operations. The default value is equal to the number of CPUs available on the system. (default 128)
+- `--offline`: Specify whether to display the list of offline hosts.
+- `-t, --timeout string`: Specifies the maximum ping timeout duration for each ping request. (default "80ms")
+- `-v, --version`: Displays the version information for `subping`.
 
 ## Import as Go Package
 
@@ -52,76 +52,76 @@ To use the Subping library, follow these steps:
 
 1. Import the Subping package:
 
-```go
-import (
-    "github.com/fadhilyori/subping"
-    "github.com/fadhilyori/subping/pkg/network"
-)
-```
+    ```go
+    import (
+        "github.com/fadhilyori/subping"
+        "github.com/fadhilyori/subping/pkg/network"
+    )
+    ```
 
 2. Create an instance of Subping by calling `NewSubping` with the desired options:
 
-```go
-subnetString := "172.17.0.0/24"
-targets, err := network.GenerateIPListFromCIDRString(subnetString)
-if err != nil {
-    log.Fatal(err.Error())
-}
-
-opts := &subping.Options{
-    Targets: targets,
-    Count:   3,
-    Timeout: 300 * time.Millisecond,
-    NumJobs: 8,
-}
-
-sp, err := subping.NewSubping(opts)
-if err != nil {
-    log.Fatal(err)
-}
-
-```
+    ```go
+    subnetString := "172.17.0.0/24"
+    targets, err := network.GenerateIPListFromCIDRString(subnetString)
+    if err != nil {
+        log.Fatal(err.Error())
+    }
+    
+    opts := &subping.Options{
+        Targets: targets,
+        Count:   3,
+        Timeout: 300 * time.Millisecond,
+        NumJobs: 8,
+    }
+    
+    sp, err := subping.NewSubping(opts)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    ```
 
 Note: Ensure that you have imported the necessary packages, such as `"time"` and `"log"`.
 
 3. Run the Subping process by calling the `Run` method:
 
-```go
-sp.Run()
-```
+    ```go
+    sp.Run()
+    ```
 
 This will initiate the ICMP ping operations on the specified IP addresses.
 
 4. Retrieve the results using the `GetResults` method:
 
-```go
-results := sp.GetResults()
-```
+    ```go
+    results := sp.GetResults()
+    ```
 
-The `results` variable will contain a map where the keys are the IP addresses, and the values are `*ping.Statistics`
-representing the ping statistics for each IP address.
+    The `results` variable will contain a map where the keys are the IP addresses, and the values are `*ping.Statistics`
+    representing the ping statistics for each IP address.
 
 5. Optionally, you can use the `GetOnlineHosts` method to filter the results and obtain only the IP addresses that
    responded
    to the ping:
 
-```go
-onlineHosts := sp.GetOnlineHosts()
-```
+    ```go
+    onlineHosts := sp.GetOnlineHosts()
+    ```
 
-The `onlineHosts` variable will contain a map of the online IP addresses and their corresponding ping statistics.
+    The `onlineHosts` variable will contain a map of the online IP addresses and their corresponding ping statistics.
 
 6. You can also call the `RunPing` function directly to perform a ping operation on a single IP address:
 
-```go
-ipAddress := net.ParseIP("192.168.1.1")
-count := 3
-timeout := 300 * time.Millisecond
+    ```go
+    ipAddress := net.ParseIP("192.168.1.1")
+    count := 3
+    timeout := 300 * time.Millisecond
+    
+    stats := subping.RunPing(ipAddress, count, timeout)
+    ```
 
-stats := subping.RunPing(ipAddress, count, timeout)
-```
-
-The `stats` variable will contain the ping statistics for the specified IP address.
+    The `stats` variable will contain the ping statistics for the specified IP address.
 
 ## Examples
 
