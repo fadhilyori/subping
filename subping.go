@@ -84,6 +84,7 @@ func (s *Subping) Run() {
 	var (
 		wg                  sync.WaitGroup
 		resultsFromRoutines []map[string]ping.Statistics
+		mutex               sync.Mutex
 	)
 
 	startJob := func(targets []net.IP) {
@@ -96,7 +97,9 @@ func (s *Subping) Run() {
 			result[target.String()] = p
 		}
 
+		mutex.Lock()
 		resultsFromRoutines = append(resultsFromRoutines, result)
+		mutex.Unlock()
 	}
 
 	for _, job := range s.PartitionedTargets {
