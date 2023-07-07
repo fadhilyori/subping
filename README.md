@@ -62,7 +62,7 @@ To use the Subping library, follow these steps:
 
     ```go
     opts := &subping.Options{
-        LogLevel: "debug"
+        LogLevel: "debug",
         Subnet: "172.17.0.0/24",
         Count:   3,
         Interval: 1 * time.Second
