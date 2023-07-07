@@ -65,7 +65,7 @@ To use the Subping library, follow these steps:
         LogLevel: "debug",
         Subnet: "172.17.0.0/24",
         Count:   3,
-        Interval: 1 * time.Second
+        Interval: 1 * time.Second,
         Timeout: 3 * time.Second,
         MaxWorkers: 8,
     }
