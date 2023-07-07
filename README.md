@@ -16,8 +16,8 @@ The documentation for the Subping library can be found in the [docs](docs/) dire
 
 The library consists of the following packages:
 
-- **github.com/fadhilyori/subping**: The main package that provides the Subping struct and related functionalities.
-- **github.com/fadhilyori/subping/pkg/network**: A subpackage that offers network-related utilities for working with IP addresses and subnet ranges.
+- **[github.com/fadhilyori/subping](docs/)**: The main package that provides the Subping struct and related functionalities.
+- **[github.com/fadhilyori/subping/pkg/network](docs/network)**: A subpackage that offers network-related utilities for working with IP addresses and subnet ranges.
 
 Please refer to the documentation for the respective packages to understand how to use them in your applications.
 
@@ -55,24 +55,19 @@ To use the Subping library, follow these steps:
     ```go
     import (
         "github.com/fadhilyori/subping"
-        "github.com/fadhilyori/subping/pkg/network"
     )
     ```
 
 2. Create an instance of Subping by calling `NewSubping` with the desired options:
 
     ```go
-    subnetString := "172.17.0.0/24"
-    targets, err := network.GenerateIPListFromCIDRString(subnetString)
-    if err != nil {
-        log.Fatal(err.Error())
-    }
-    
     opts := &subping.Options{
-        Targets: targets,
+        LogLevel: "debug",
+        Subnet: "172.17.0.0/24",
         Count:   3,
-        Timeout: 300 * time.Millisecond,
-        NumJobs: 8,
+        Interval: 1 * time.Second
+        Timeout: 3 * time.Second,
+        MaxWorkers: 8,
     }
     
     sp, err := subping.NewSubping(opts)
@@ -92,13 +87,13 @@ Note: Ensure that you have imported the necessary packages, such as `"time"` and
 
 This will initiate the ICMP ping operations on the specified IP addresses.
 
-4. Retrieve the results using the `GetResults` method:
+4. Retrieve the results:
 
     ```go
-    results := sp.GetResults()
+    results := sp.Results
     ```
 
-    The `results` variable will contain a map where the keys are the IP addresses, and the values are `*ping.Statistics`
+    The `results` variable will contain a map where the keys are the IP addresses, and the values are `*subping.Result`
     representing the ping statistics for each IP address.
 
 5. Optionally, you can use the `GetOnlineHosts` method to filter the results and obtain only the IP addresses that

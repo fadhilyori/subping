@@ -10,7 +10,6 @@ import (
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fadhilyori/subping"
-	"github.com/fadhilyori/subping/pkg/network"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +17,7 @@ var (
 	pingCount           int
 	pingTimeoutStr      string
 	pingIntervalStr     string
-	pingNumJobs         int
+	pingMaxWorkers      int
 	subpingVersion      = "latest"
 	showOfflineHostList bool
 )
@@ -33,6 +32,7 @@ func main() {
 		Run:     runSubping,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			figure.NewFigure("subping", "larry3d", true).Print()
+			fmt.Println(cmd.Version)
 			fmt.Print("\n\n")
 		},
 	}
@@ -42,7 +42,7 @@ func main() {
 	flags.IntVarP(&pingCount, "count", "c", 1,
 		"Specifies the number of ping attempts for each IP address.",
 	)
-	flags.IntVarP(&pingNumJobs,
+	flags.IntVarP(&pingMaxWorkers,
 		"job", "n", 128,
 		"Specifies the number of maximum concurrent jobs spawned to perform ping operations.",
 	)
@@ -61,7 +61,7 @@ func main() {
 	}
 }
 
-func runSubping(cmd *cobra.Command, args []string) {
+func runSubping(_ *cobra.Command, args []string) {
 	subnetString := args[0]
 
 	startTime := time.Now()
@@ -76,41 +76,33 @@ func runSubping(cmd *cobra.Command, args []string) {
 		log.Fatal(err.Error())
 	}
 
-	ips, err := network.GenerateIPListFromCIDRString(subnetString)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	totalHost := len(ips)
-
 	s, err := subping.NewSubping(&subping.Options{
-		Targets:  ips,
-		Count:    pingCount,
-		Interval: pingInterval,
-		Timeout:  pingTimeout * time.Duration(pingCount),
-		NumJobs:  pingNumJobs,
+		Subnet:     subnetString,
+		Count:      pingCount,
+		Interval:   pingInterval,
+		Timeout:    pingTimeout * time.Duration(pingCount),
+		MaxWorkers: pingMaxWorkers,
+		LogLevel:   "error",
 	})
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	_, cidr, err := net.ParseCIDR(subnetString)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	fmt.Printf("Network        : %s\n", cidr.String())
-	fmt.Printf("IP Ranges      : %s - %s\n", ips[0].String(), ips[len(ips)-1].String())
-	fmt.Printf("Total hosts    : %d\n", totalHost)
-	fmt.Printf("Num of workers : %d\n", len(s.PartitionedTargets))
-	fmt.Println(`---------------------------------------`)
-	fmt.Println("| IP Address       | Avg Latency      |")
-	fmt.Println(`---------------------------------------`)
+	fmt.Printf("Network        : %s\n", s.TargetsIterator.IPNet.String())
+	fmt.Printf("IP Ranges      : %s - %s\n", s.TargetsIterator.FirstIP.String(), s.TargetsIterator.LastIP.String())
+	fmt.Printf("Total hosts    : %d\n", s.TargetsIterator.TotalHosts)
+	fmt.Printf("Total workers  : %d\n", s.MaxWorkers)
+	fmt.Printf("Count          : %d\n", s.Count)
+	fmt.Printf("Interval       : %s\n", s.Interval.String())
+	fmt.Printf("Timeout        : %s\n", s.Timeout.String())
+	fmt.Println(`--------------------------------------------------------`)
+	fmt.Println("| IP Address       | Avg Latency      | Packet Loss    |")
+	fmt.Println(`--------------------------------------------------------`)
 	fmt.Printf("Pinging...")
 
 	s.Run()
 
-	results := s.GetOnlineHosts()
+	results, totalHostOnline := s.GetOnlineHosts()
 
 	// Extract keys into a slice
 	keys := make([]net.IP, 0, len(results))
@@ -120,7 +112,7 @@ func runSubping(cmd *cobra.Command, args []string) {
 
 	// Sort the keys Based on byte comparison
 	sort.Slice(keys, func(i, j int) bool {
-		return bytes.Compare(keys[i].To4(), keys[j].To4()) < 0
+		return bytes.Compare(keys[i].To16(), keys[j].To16()) < 0
 	})
 
 	fmt.Print("\r")
@@ -129,24 +121,24 @@ func runSubping(cmd *cobra.Command, args []string) {
 		// convert bytes to string in each line of IP
 		ipString := ip.String()
 		stats := results[ipString]
+		packetLossPercentageStr := fmt.Sprintf("%.2f %%", stats.PacketLoss)
 
-		fmt.Printf("| %-16s | %-16s |\n", ipString, stats.AvgRtt.String())
+		fmt.Printf("| %-16s | %-16s | %-14s |\n", ipString, stats.AvgRtt.String(), packetLossPercentageStr)
 	}
 
-	fmt.Println(`---------------------------------------`)
+	fmt.Println(`--------------------------------------------------------`)
 
 	if showOfflineHostList {
-		fmt.Println("Offline hosts :")
+		fmt.Println("\nOffline hosts :")
 		for ip, stats := range s.Results {
 			if stats.PacketsRecv == 0 {
-				fmt.Printf(" - %s\n", ip)
+				fmt.Printf(" - %s\t(Loss: %s, Latency: %s)\n", ip, fmt.Sprintf("%.2f %%", stats.PacketLoss), stats.AvgRtt.String())
 			}
 		}
 	}
 
 	elapsed := time.Since(startTime)
-	totalHostOnline := len(results)
-	totalHostOffline := totalHost - totalHostOnline
+	totalHostOffline := s.TargetsIterator.TotalHosts - totalHostOnline
 
 	fmt.Printf("\nTotal Hosts Online  : %d\n", totalHostOnline)
 	fmt.Printf("Total Hosts Offline : %d\n", totalHostOffline)

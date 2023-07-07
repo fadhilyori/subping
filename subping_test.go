@@ -1,122 +1,161 @@
 package subping_test
 
 import (
-	"fmt"
-	"net"
-	"reflect"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/fadhilyori/subping"
-	"github.com/go-ping/ping"
+	"github.com/fadhilyori/subping/pkg/network"
 )
 
-var (
-	targetsLocalWithSubnet29 = []net.IP{
-		net.ParseIP("127.0.0.1"),
-		net.ParseIP("127.0.0.2"),
-		net.ParseIP("127.0.0.3"),
-		net.ParseIP("127.0.0.4"),
-		net.ParseIP("127.0.0.5"),
-		net.ParseIP("127.0.0.6"),
-	}
-)
-
-func TestNewSubping(t *testing.T) {
+func TestRunSubping(t *testing.T) {
 	type args struct {
-		opts *subping.Options
+		CIDR       string
+		Count      int
+		Timeout    time.Duration
+		Interval   time.Duration
+		MaxWorkers int
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    subping.Subping
-		wantErr bool
+		name       string
+		args       args
+		wantErr    bool
+		wantOnline bool
 	}{
 		{
 			name: "Test with valid options",
 			args: args{
-				opts: &subping.Options{
-					Targets:  targetsLocalWithSubnet29,
-					Count:    3,
-					Timeout:  1 * time.Second,
-					Interval: 300 * time.Millisecond,
-					NumJobs:  2,
-				},
+				CIDR:       "127.0.0.1/31",
+				Count:      1,
+				Timeout:    300 * time.Millisecond,
+				Interval:   300 * time.Millisecond,
+				MaxWorkers: 1,
 			},
-			want: subping.Subping{
-				Targets:  targetsLocalWithSubnet29,
-				Count:    3,
-				Timeout:  1 * time.Second,
-				Interval: 300 * time.Millisecond,
-				NumJobs:  2,
-			},
-			wantErr: false,
+			wantErr:    false,
+			wantOnline: false,
 		},
 		{
 			name: "Test with invalid Count",
 			args: args{
-				opts: &subping.Options{
-					Targets:  targetsLocalWithSubnet29,
-					Count:    -1,
-					Timeout:  1 * time.Second,
-					Interval: 300 * time.Millisecond,
-					NumJobs:  2,
-				},
+				CIDR:       "127.0.0.0/29",
+				Count:      -1,
+				Timeout:    1 * time.Second,
+				Interval:   300 * time.Millisecond,
+				MaxWorkers: 2,
 			},
-			want: subping.Subping{
-				Targets:  nil,
-				Count:    0,
-				Timeout:  0,
-				Interval: 0,
-				NumJobs:  0,
-			},
-			wantErr: true,
+			wantErr:    true,
+			wantOnline: false,
 		},
 		{
-			name: "Test with invalid NumJobs",
+			name: "Test with invalid MaxWorkers",
 			args: args{
-				opts: &subping.Options{
-					Targets:  targetsLocalWithSubnet29,
-					Count:    1,
-					Interval: 300 * time.Millisecond,
-					NumJobs:  -2,
-				},
+				CIDR:       "127.0.0.0/29",
+				Count:      1,
+				Timeout:    1 * time.Second,
+				Interval:   300 * time.Millisecond,
+				MaxWorkers: -2,
 			},
-			want: subping.Subping{
-				Targets:  nil,
-				Count:    0,
-				Interval: 0,
-				NumJobs:  0,
+			wantErr:    true,
+			wantOnline: false,
+		},
+		{
+			name: "Test with IPv6 ::1/128",
+			args: args{
+				CIDR:       "::1/128",
+				Count:      4,
+				Timeout:    1 * time.Second,
+				Interval:   300 * time.Millisecond,
+				MaxWorkers: 1,
 			},
-			wantErr: true,
+			wantErr:    false,
+			wantOnline: true,
+		},
+		{
+			name: "Test with IPv4 /20 should online all - high conccurency",
+			args: args{
+				CIDR:       "127.0.0.0/24",
+				Count:      1,
+				Timeout:    1 * time.Second,
+				Interval:   300 * time.Millisecond,
+				MaxWorkers: 256,
+			},
+			wantErr:    false,
+			wantOnline: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := subping.NewSubping(tt.args.opts)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("NewSubping() error = %v, wantErr %v", err, tt.wantErr)
+			sp, err := subping.NewSubping(&subping.Options{
+				Subnet:     tt.args.CIDR,
+				Count:      tt.args.Count,
+				Interval:   tt.args.Interval,
+				Timeout:    tt.args.Timeout,
+				MaxWorkers: tt.args.MaxWorkers,
+				LogLevel:   "debug",
+			})
+			if err != nil {
+				if !tt.wantErr {
+					t.Errorf("NewSubping() error = %v, wantErr %v", err, tt.wantErr)
+				}
+
 				return
 			}
 
-			if !reflect.DeepEqual(got.Targets, tt.want.Targets) {
-				t.Errorf("NewSubping() Targets got = %v, want %v", got, tt.want)
+			if sp.TargetsIterator == nil && !tt.wantErr {
+				t.Errorf("NewSubping() TargetsIterator = nil, want *network.SubnetHostsIterator, wantErr %v", tt.wantErr)
+				return
 			}
 
-			if got.Count != tt.want.Count {
-				t.Errorf("NewSubping() Count got = %v, want %v", got, tt.want)
+			if sp.Count != tt.args.Count {
+				t.Errorf("NewSubping() Count got = %v, want %v, wantErr %v", sp.Count, tt.args.Count, tt.wantErr)
+				return
 			}
 
-			if got.Timeout != tt.want.Timeout {
-				t.Errorf("NewSubping() Timeout got = %v, want %v", got, tt.want)
+			if sp.Timeout != tt.args.Timeout {
+				t.Errorf("NewSubping() Timeout got = %v, want %v, wantErr %v", sp.Timeout, tt.args.Timeout, tt.wantErr)
+				return
 			}
 
-			if got.Interval != tt.want.Interval {
-				t.Errorf("NewSubping() Interval got = %v, want %v", got, tt.want)
+			if sp.Interval != tt.args.Interval {
+				t.Errorf("NewSubping() Interval got = %v, want %v, wantErr %v", sp.Interval, tt.args.Interval, tt.wantErr)
+				return
 			}
 
-			if got.NumJobs != tt.want.NumJobs {
-				t.Errorf("NewSubping() NumJobs got = %v, want %v", got, tt.want)
+			if sp.MaxWorkers != tt.args.MaxWorkers {
+				t.Errorf("NewSubping() MaxWorkers got = %v, want %v, wantErr %v", sp.MaxWorkers, tt.args.MaxWorkers, tt.wantErr)
+				return
+			}
+
+			sp.Run()
+			_, onlineResultsLen := sp.GetOnlineHosts()
+
+			wantTotalResults, err := network.CalculateTotalHostsFromCIDRString(tt.args.CIDR)
+			if err != nil {
+				t.Errorf("CalculateTotalHostsFromCIDRString() error => %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if wantTotalResults != sp.TotalResults {
+				var hosts []string
+				for k := range sp.Results {
+					hosts = append(hosts, k)
+				}
+
+				sort.Strings(hosts)
+
+				t.Errorf("Subping.Results length is invalid => got %v (%v), want %v, wantErr %v\nError: %v", sp.TotalResults, len(sp.Results), wantTotalResults, tt.wantErr, hosts)
+				return
+			}
+
+			if tt.wantOnline && onlineResultsLen != sp.TotalResults {
+				var hosts []string
+				for k := range sp.Results {
+					hosts = append(hosts, k)
+				}
+
+				t.Errorf("Subping.Results length online hosts is invalid => got %v, want %v, wantErr %v\nOffline: %v", onlineResultsLen, wantTotalResults, tt.wantErr, hosts)
+				return
 			}
 		})
 	}
@@ -177,137 +216,6 @@ func TestRunPing(t *testing.T) {
 
 			if got.PacketsSent != tt.want.PacketsSent {
 				t.Errorf("RunPing() PacketsSent = %v, want %v", got.PacketsSent, tt.want.PacketsSent)
-			}
-		})
-	}
-}
-
-func TestSubping_GetOnlineHosts(t *testing.T) {
-	type fields struct {
-		targets  []net.IP
-		count    int
-		interval time.Duration
-		timeout  time.Duration
-		numJobs  int
-		results  map[string]*ping.Statistics
-	}
-
-	var targetsLocalWithSubnet27 []net.IP
-
-	for i := 1; i < 30; i++ {
-		targetsLocalWithSubnet27 = append(targetsLocalWithSubnet27, net.ParseIP(fmt.Sprintf("127.0.0.%d", i)))
-	}
-
-	tests := []struct {
-		name   string
-		fields fields
-	}{
-		{
-			name: "Ping to 127.0.0.1/27 with number of jobs 2",
-			fields: fields{
-				targets:  targetsLocalWithSubnet27,
-				count:    3,
-				interval: 300 * time.Millisecond,
-				timeout:  1 * time.Second,
-				numJobs:  2,
-			},
-		},
-		{
-			name: "Ping to 127.0.0.1/27 with number of jobs 20",
-			fields: fields{
-				targets:  targetsLocalWithSubnet27,
-				count:    3,
-				interval: 300 * time.Millisecond,
-				timeout:  1 * time.Second,
-				numJobs:  20,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s, err := subping.NewSubping(&subping.Options{
-				Targets:  tt.fields.targets,
-				Count:    tt.fields.count,
-				Interval: tt.fields.interval,
-				Timeout:  tt.fields.timeout,
-				NumJobs:  tt.fields.numJobs,
-			})
-			if err != nil {
-				t.Errorf("GetOnlineHosts() error = %v\n", err)
-			}
-
-			s.Run()
-
-			got := s.GetOnlineHosts()
-
-			for i, h := range got {
-				if h.PacketsRecv == 0 {
-					t.Errorf("GetOnlineHosts() = %v should be offline", i)
-				}
-			}
-		})
-	}
-}
-
-func TestSubping_Run(t *testing.T) {
-	var targetsLocalWithSubnet27 []net.IP
-
-	for i := 1; i < 30; i++ {
-		targetsLocalWithSubnet27 = append(targetsLocalWithSubnet27, net.ParseIP(fmt.Sprintf("127.0.0.%d", i)))
-	}
-
-	type fields struct {
-		targets  []net.IP
-		count    int
-		interval time.Duration
-		timeout  time.Duration
-		numJobs  int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-	}{
-		{
-			name: "Ping to 127.0.0.1/27 with number of jobs 2",
-			fields: fields{
-				targets:  targetsLocalWithSubnet27,
-				count:    3,
-				interval: 300 * time.Millisecond,
-				timeout:  1 * time.Second,
-				numJobs:  2,
-			},
-		},
-		{
-			name: "Ping to 127.0.0.1/27 with number of jobs 50",
-			fields: fields{
-				targets:  targetsLocalWithSubnet27,
-				count:    3,
-				interval: 300 * time.Millisecond,
-				timeout:  1 * time.Second,
-				numJobs:  50,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s, err := subping.NewSubping(&subping.Options{
-				Targets:  tt.fields.targets,
-				Count:    tt.fields.count,
-				Interval: tt.fields.interval,
-				Timeout:  tt.fields.timeout,
-				NumJobs:  tt.fields.numJobs,
-			})
-			if err != nil {
-				t.Errorf("Run() error = %v", err)
-			}
-
-			s.Run()
-
-			lenOfResults := len(s.Results)
-			lenOfTargets := len(s.Targets)
-
-			if lenOfResults != lenOfTargets {
-				t.Errorf("Run() = %v, want %v", lenOfResults, lenOfTargets)
 			}
 		})
 	}
