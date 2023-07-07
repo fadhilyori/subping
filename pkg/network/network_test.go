@@ -1,203 +1,140 @@
 package network_test
 
 import (
+	"math"
 	"net"
-	"reflect"
 	"testing"
 
 	"github.com/fadhilyori/subping/pkg/network"
 )
 
-func TestFindIPsOutsideSubnet(t *testing.T) {
-	type args struct {
-		ipAddresses []net.IP
-		subnet      *net.IPNet
-	}
+func TestHostsIterator(t *testing.T) {
 	tests := []struct {
 		name string
-		args args
-		want []net.IP
+		cidr string
+		want int
 	}{
 		{
-			name: "Should be no invalid IP Address in subnet 24",
-			args: args{
-				ipAddresses: []net.IP{
-					net.ParseIP("192.168.1.1"),
-					net.ParseIP("192.168.1.2"),
-					net.ParseIP("192.168.1.3"),
-				},
-				subnet: &net.IPNet{
-					IP:   net.ParseIP("192.168.1.0"),
-					Mask: net.CIDRMask(24, 32),
-				},
-			},
-			want: []net.IP{},
+			name: "IPv4 Subnet 28",
+			cidr: "127.0.0.0/28",
+			want: int(math.Pow(2, 32-28)),
 		},
 		{
-			name: "Should be 1 invalid IP Address in subnet 24",
-			args: args{
-				ipAddresses: []net.IP{
-					net.ParseIP("192.168.1.1"),
-					net.ParseIP("192.168.1.2"),
-					net.ParseIP("192.168.1.3"),
-					net.ParseIP("192.168.2.5"),
-				},
-				subnet: &net.IPNet{
-					IP:   net.ParseIP("192.168.1.0"),
-					Mask: net.CIDRMask(24, 32),
-				},
-			},
-			want: []net.IP{
-				net.ParseIP("192.168.2.5"),
-			},
+			name: "IPv4 Subnet 24",
+			cidr: "127.0.0.0/24",
+			want: int(math.Pow(2, 32-24)),
 		},
 		{
-			name: "Should be 3 invalid IP Address in subnet 28",
-			args: args{
-				ipAddresses: []net.IP{
-					net.ParseIP("192.168.1.1"),
-					net.ParseIP("192.168.1.2"),
-					net.ParseIP("192.168.1.3"),
-					net.ParseIP("192.168.1.16"),
-					net.ParseIP("192.168.1.65"),
-					net.ParseIP("192.168.2.4"),
-				},
-				subnet: &net.IPNet{
-					IP:   net.ParseIP("192.168.1.0"),
-					Mask: net.CIDRMask(28, 32),
-				},
-			},
-			want: []net.IP{
-				net.ParseIP("192.168.1.16"),
-				net.ParseIP("192.168.1.65"),
-				net.ParseIP("192.168.2.4"),
-			},
+			name: "IPv4 Subnet 8",
+			cidr: "127.0.0.0/8",
+			want: int(math.Pow(2, 32-8)),
+		},
+		{
+			name: "IPv6 Subnet 125",
+			cidr: "2001:db8:1::/125",
+			want: int(math.Pow(2, 128-125)),
+		},
+		{
+			name: "IPv6 Subnet 120",
+			cidr: "2001:db8:1::/120",
+			want: int(math.Pow(2, 128-120)),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := network.FindIPsOutsideSubnet(tt.args.ipAddresses, tt.args.subnet); !reflect.DeepEqual(got, tt.want) {
-				if len(got) == 0 && len(tt.want) == 0 {
-					return
-				}
+			count := 0
+			iterator, err := network.NewSubnetHostsIteratorFromCIDRString(tt.cidr)
+			if err != nil {
+				t.Errorf("NewSubnetHostsIteratorFromString() error => %v", err)
+			}
+			_, ipNet, _ := net.ParseCIDR(tt.cidr)
 
-				t.Errorf("FindIPsOutsideSubnet() = %v, want %v", got, tt.want)
+			for ip := iterator.Next(); ip != nil; ip = iterator.Next() {
+				if !ipNet.Contains(*ip) {
+					t.Errorf("Next() host should not in the subnet %s, got %s", ipNet.String(), ip.String())
+				}
+				count++
+			}
+
+			if count != tt.want || count != iterator.TotalHosts {
+				t.Errorf("SubnetHostsIterator{} number of hosts is not %d, got %d (%d)", tt.want, count, iterator.TotalHosts)
 			}
 		})
 	}
 }
 
-func TestGenerateIPListFromCIDR(t *testing.T) {
-	type args struct {
-		cidr *net.IPNet
-	}
-
-	_, subnet16, _ := net.ParseCIDR("192.168.1.0/16")
-	_, subnet24, _ := net.ParseCIDR("192.168.1.0/24")
-	_, subnet30, _ := net.ParseCIDR("192.168.1.0/30")
-
+func BenchmarkHostsIterator(b *testing.B) {
 	tests := []struct {
 		name string
-		args args
+		cidr string
+		want int
 	}{
 		{
-			name: "Generate IP list for a /16 subnet should have 65536 entries.",
-			args: args{
-				cidr: subnet16,
-			},
-		},
-		{
-			name: "Generate IP list for a /24 subnet should have 256 entries.",
-			args: args{
-				cidr: subnet24,
-			},
-		},
-		{
-			name: "Generate IP list for a /30 subnet should have 4 entries.",
-			args: args{
-				cidr: subnet30,
-			},
+			name: "IPv6 Subnet 100",
+			cidr: "2001:db8:1::/100",
+			want: int(math.Pow(2, 128-100)),
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := network.GenerateIPListFromCIDR(tt.args.cidr)
-
-			var wrongIPS []string
-
-			for _, ip := range got {
-				if !tt.args.cidr.Contains(ip) {
-					wrongIPS = append(wrongIPS, ip.String())
-				}
+	for _, bb := range tests {
+		b.Run(bb.name, func(b *testing.B) {
+			count := 0
+			iterator, err := network.NewSubnetHostsIteratorFromCIDRString(bb.cidr)
+			if err != nil {
+				b.Errorf("NewSubnetHostsIteratorFromString() error => %v", err)
 			}
 
-			if len(wrongIPS) > 0 {
-				t.Errorf("GenerateIPListFromCIDR() invalid IP = %v", wrongIPS)
+			_, ipNet, _ := net.ParseCIDR(bb.cidr)
+
+			for ip := iterator.Next(); ip != nil; ip = iterator.Next() {
+				if !ipNet.Contains(*ip) {
+					b.Errorf("Next() host should not in the subnet %s, got %s", ipNet.String(), ip.String())
+				}
+				count++
+			}
+
+			if count != bb.want || count != iterator.TotalHosts {
+				b.Errorf("SubnetHostsIterator{} number of hosts is not %d, got %d (%d)", bb.want, count, iterator.TotalHosts)
 			}
 		})
 	}
 }
 
-func TestGenerateIPListFromCIDRString(t *testing.T) {
+func TestCalculateTotalHostsFromCIDRString(t *testing.T) {
 	type args struct {
 		cidr string
 	}
-
 	tests := []struct {
 		name    string
 		args    args
-		want    []net.IP
+		want    int
 		wantErr bool
 	}{
 		{
-			name: "Generate IP list for a /16 subnet should have 65536 entries.",
+			name: "IPv4 /24",
 			args: args{
-				cidr: "192.168.1.0/16",
+				cidr: "127.0.0.0/24",
 			},
+			want:    256,
 			wantErr: false,
 		},
 		{
-			name: "Generate IP list for a /24 subnet should have 256 entries.",
+			name: "IPv6 /64",
 			args: args{
-				cidr: "192.168.1.0/24",
+				cidr: "::1/120",
 			},
+			want:    256,
 			wantErr: false,
-		},
-		{
-			name: "Generate IP list for a /30 subnet should have 4 entries.",
-			args: args{
-				cidr: "192.168.1.0/30",
-			},
-			wantErr: false,
-		},
-		{
-			name: "Generate IP list for a invalid subnet should error.",
-			args: args{
-				cidr: "192.168.1.0",
-			},
-			wantErr: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := network.GenerateIPListFromCIDRString(tt.args.cidr)
+			got, err := network.CalculateTotalHostsFromCIDRString(tt.args.cidr)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("GenerateIPListFromCIDRString() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("CalculateTotalHostsFromCIDRString() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-
-			_, cidr, _ := net.ParseCIDR(tt.args.cidr)
-
-			var wrongIPS []string
-
-			for _, ip := range got {
-				if !cidr.Contains(ip) {
-					wrongIPS = append(wrongIPS, ip.String())
-				}
-			}
-
-			if len(wrongIPS) > 0 {
-				t.Errorf("GenerateIPListFromCIDR() invalid IP = %v", wrongIPS)
+			if got != tt.want {
+				t.Errorf("CalculateTotalHostsFromCIDRString() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
