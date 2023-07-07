@@ -6,13 +6,46 @@
 import "github.com/fadhilyori/subping"
 ```
 
+Package subping provides a utility for concurrently pinging multiple IP addresses and collecting the results.
+
+The package includes functionality for running ping operations on multiple IP addresses concurrently, calculating ping statistics, and partitioning data for parallel processing.
+
+Example usage:
+
+```
+// Create options for Subping
+opts := &subping.Options{
+    LogLevel:   "info",
+    Subnet:     "192.168.0.0/24",
+    Count:      5,
+    Interval:   time.Second,
+    Timeout:    2 * time.Second,
+    MaxWorkers: 10,
+}
+
+// Create a new Subping instance
+sp, err := subping.NewSubping(opts)
+if err != nil {
+    log.Fatalf("Failed to create Subping instance: %v", err)
+}
+
+// Run the Subping process
+sp.Run()
+
+// Get the online hosts and their statistics
+onlineHosts, total := sp.GetOnlineHosts()
+fmt.Printf("Online Hosts: %v\n", onlineHosts)
+fmt.Printf("Total Online Hosts: %d\n", total)
+```
+
 ## Index
 
 - [func RunPing\(ipAddress string, count int, interval time.Duration, timeout time.Duration\) ping.Statistics](<#RunPing>)
 - [type Options](<#Options>)
+- [type Result](<#Result>)
 - [type Subping](<#Subping>)
-  - [func NewSubping\(opts \*Options\) \(Subping, error\)](<#NewSubping>)
-  - [func \(s \*Subping\) GetOnlineHosts\(\) map\[string\]ping.Statistics](<#Subping.GetOnlineHosts>)
+  - [func NewSubping\(opts \*Options\) \(\*Subping, error\)](<#NewSubping>)
+  - [func \(s \*Subping\) GetOnlineHosts\(\) \(map\[string\]Result, int\)](<#Subping.GetOnlineHosts>)
   - [func \(s \*Subping\) Run\(\)](<#Subping.Run>)
 
 
@@ -23,7 +56,7 @@ import "github.com/fadhilyori/subping"
 func RunPing(ipAddress string, count int, interval time.Duration, timeout time.Duration) ping.Statistics
 ```
 
-RunPing sends ICMP echo requests to the specified IP address and returns the ping statistics.
+RunPing performs a ping operation to the specified IP address. It sends the specified number of ping requests with the given interval and timeout.
 
 <a name="Options"></a>
 ## type Options
@@ -32,50 +65,81 @@ Options holds the configuration options for creating a new Subping instance.
 
 ```go
 type Options struct {
-    // List of IP addresses to ping
-    Targets []net.IP
+    // LogLevel sets the log levels for the Subping instance.
+    LogLevel string
 
-    // Number of ping packets to send
+    // Subnet is the subnet to scan for IP addresses to ping.
+    Subnet string
+
+    // Count is the number of ping requests to send for each target.
     Count int
 
-    // Interval for each ping request
+    // Interval is the time duration between each ping request.
     Interval time.Duration
 
-    // Timeout specifies a timeout before exits each target
+    // Timeout specifies the timeout duration before exiting each target.
     Timeout time.Duration
 
-    // Number of concurrent jobs to execute
-    NumJobs int
+    // MaxWorkers specifies the maximum number of concurrent workers to use.
+    MaxWorkers int
+}
+```
+
+<a name="Result"></a>
+## type Result
+
+Result contains the statistics and metrics for a single ping operation.
+
+```go
+type Result struct {
+    // AvgRtt is the average round-trip time of the ping requests.
+    AvgRtt time.Duration
+
+    // PacketLoss is the percentage of packets lost during the ping operation.
+    PacketLoss float64
+
+    // PacketsSent is the number of packets sent for the ping operation.
+    PacketsSent int
+
+    // PacketsRecv is the number of packets received for the ping operation.
+    PacketsRecv int
+
+    // PacketsRecvDuplicates is the number of duplicate packets received.
+    PacketsRecvDuplicates int
 }
 ```
 
 <a name="Subping"></a>
 ## type Subping
 
-Subping is a utility for concurrently pinging multiple IP addresses and collecting the Results.
+Subping is a utility for concurrently pinging multiple IP addresses and collecting the results.
 
 ```go
 type Subping struct {
-    // List of IP addresses to ping
-    Targets []net.IP
+    // TargetsIterator is an iterator for the target IP addresses to ping.
+    TargetsIterator *network.SubnetHostsIterator
 
-    // Number of ping packets to send
+    // Count is the number of ping requests to send for each target.
     Count int
 
-    // Interval for each ping request
+    // Interval is the time duration between each ping request.
     Interval time.Duration
 
-    // Timeout specifies a timeout before exits each target
+    // Timeout specifies the timeout duration before exiting each target.
     Timeout time.Duration
 
-    // Number of concurrent jobs to execute
-    NumJobs int
+    // BatchSize is the number of concurrent ping jobs to execute.
+    BatchSize int64
 
-    // Results of the ping requests
-    Results map[string]ping.Statistics
+    // Results stores the ping results for each target IP address.
+    Results map[string]Result
 
-    // PartitionedTargets List of IP addresses that have already been partitioned for pinging.
-    PartitionedTargets [][]net.IP
+    // TotalResults represents the total number of ping results collected.
+    TotalResults int
+
+    // MaxWorkers specifies the maximum number of concurrent workers to use.
+    MaxWorkers int
+    // contains filtered or unexported fields
 }
 ```
 
@@ -83,7 +147,7 @@ type Subping struct {
 ### func NewSubping
 
 ```go
-func NewSubping(opts *Options) (Subping, error)
+func NewSubping(opts *Options) (*Subping, error)
 ```
 
 NewSubping creates a new Subping instance with the provided options.
@@ -92,10 +156,10 @@ NewSubping creates a new Subping instance with the provided options.
 ### func \(\*Subping\) GetOnlineHosts
 
 ```go
-func (s *Subping) GetOnlineHosts() map[string]ping.Statistics
+func (s *Subping) GetOnlineHosts() (map[string]Result, int)
 ```
 
-GetOnlineHosts returns the Results of the ping requests for IP addresses that responded successfully.
+GetOnlineHosts returns a map of online hosts and their corresponding ping results, as well as the total number of online hosts.
 
 <a name="Subping.Run"></a>
 ### func \(\*Subping\) Run
@@ -104,6 +168,6 @@ GetOnlineHosts returns the Results of the ping requests for IP addresses that re
 func (s *Subping) Run()
 ```
 
-Run starts the ping operation on the specified IP addresses using the configured options.
+Run starts the Subping process, concurrently pinging the target IP addresses. It spawns worker goroutines, assigns tasks to them, waits for them to finish, and collects the results.
 
 Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)

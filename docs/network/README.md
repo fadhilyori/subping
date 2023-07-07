@@ -6,38 +6,133 @@
 import "github.com/fadhilyori/subping/pkg/network"
 ```
 
+Package network provides functionality for working with IP networks and subnet hosts.
+
+The package includes functions for iterating over hosts within a subnet, calculating the total number of hosts in a subnet, parsing CIDR notation, and obtaining the first and last IP addresses from an IP network.
+
+Examples:
+
+```
+ipNet := &net.IPNet{IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(24, 32)}
+it := network.NewSubnetHostsIterator(ipNet)
+
+for ip := it.Next(); ip != nil; ip = it.Next() {
+	// Process the host IP
+	fmt.Println(ip.String())
+}
+
+cidr := "192.168.0.0/24"
+totalHosts, err := network.CalculateTotalHostsFromCIDRString(cidr)
+if err != nil {
+	fmt.Println("Error:", err)
+	return
+}
+fmt.Println("Total hosts:", totalHosts)
+
+firstIP := network.GetFirstIPAddressFromIPNet(ipNet)
+lastIP := network.GetLastIPAddressFromIPNet(ipNet)
+fmt.Println("First IP:", firstIP)
+fmt.Println("Last IP:", lastIP)
+```
+
 ## Index
 
-- [func FindIPsOutsideSubnet\(ipAddresses \[\]net.IP, subnet \*net.IPNet\) \[\]net.IP](<#FindIPsOutsideSubnet>)
-- [func GenerateIPListFromCIDR\(cidr \*net.IPNet\) \[\]net.IP](<#GenerateIPListFromCIDR>)
-- [func GenerateIPListFromCIDRString\(cidr string\) \(\[\]net.IP, error\)](<#GenerateIPListFromCIDRString>)
+- [func CalculateTotalHosts\(ipNet \*net.IPNet\) int](<#CalculateTotalHosts>)
+- [func CalculateTotalHostsFromCIDRString\(cidr string\) \(int, error\)](<#CalculateTotalHostsFromCIDRString>)
+- [func GetFirstIPAddressFromIPNet\(ipNet \*net.IPNet\) net.IP](<#GetFirstIPAddressFromIPNet>)
+- [func GetLastIPAddressFromIPNet\(ipNet \*net.IPNet\) net.IP](<#GetLastIPAddressFromIPNet>)
+- [type SubnetHostsIterator](<#SubnetHostsIterator>)
+  - [func NewSubnetHostsIterator\(ipNet \*net.IPNet\) \*SubnetHostsIterator](<#NewSubnetHostsIterator>)
+  - [func NewSubnetHostsIteratorFromCIDRString\(cidr string\) \(\*SubnetHostsIterator, error\)](<#NewSubnetHostsIteratorFromCIDRString>)
+  - [func \(it \*SubnetHostsIterator\) Next\(\) \*net.IP](<#SubnetHostsIterator.Next>)
 
 
-<a name="FindIPsOutsideSubnet"></a>
-## func FindIPsOutsideSubnet
-
-```go
-func FindIPsOutsideSubnet(ipAddresses []net.IP, subnet *net.IPNet) []net.IP
-```
-
-FindIPsOutsideSubnet returns a list of IP addresses from the given slice that are outside the specified subnet.
-
-<a name="GenerateIPListFromCIDR"></a>
-## func GenerateIPListFromCIDR
+<a name="CalculateTotalHosts"></a>
+## func CalculateTotalHosts
 
 ```go
-func GenerateIPListFromCIDR(cidr *net.IPNet) []net.IP
+func CalculateTotalHosts(ipNet *net.IPNet) int
 ```
 
-GenerateIPListFromCIDR generates a list of IP addresses within the specified range based on the given CIDR notation.
+CalculateTotalHosts calculates the total number of hosts based on the provided IP network.
 
-<a name="GenerateIPListFromCIDRString"></a>
-## func GenerateIPListFromCIDRString
+<a name="CalculateTotalHostsFromCIDRString"></a>
+## func CalculateTotalHostsFromCIDRString
 
 ```go
-func GenerateIPListFromCIDRString(cidr string) ([]net.IP, error)
+func CalculateTotalHostsFromCIDRString(cidr string) (int, error)
 ```
 
-GenerateIPListFromCIDRString parses the given CIDR string and generates a list of IP addresses within the specified range. The CIDR string should be in the form "ip/mask", e.g., "192.168.0.0/24".
+CalculateTotalHostsFromCIDRString calculates the total number of hosts based on the provided CIDR string.
+
+<a name="GetFirstIPAddressFromIPNet"></a>
+## func GetFirstIPAddressFromIPNet
+
+```go
+func GetFirstIPAddressFromIPNet(ipNet *net.IPNet) net.IP
+```
+
+GetFirstIPAddressFromIPNet returns the first host IP address within the given IP network.
+
+<a name="GetLastIPAddressFromIPNet"></a>
+## func GetLastIPAddressFromIPNet
+
+```go
+func GetLastIPAddressFromIPNet(ipNet *net.IPNet) net.IP
+```
+
+GetLastIPAddressFromIPNet returns the last host IP address within the given IP network.
+
+<a name="SubnetHostsIterator"></a>
+## type SubnetHostsIterator
+
+SubnetHostsIterator represents an iterator over the hosts within a subnet.
+
+```go
+type SubnetHostsIterator struct {
+    // IPNet represents the subnet to iterate over.
+    IPNet *net.IPNet
+
+    // CurrentIP represents the current host IP.
+    CurrentIP *net.IP
+
+    // FirstIP represents the first host IP in the subnet.
+    FirstIP net.IP
+
+    // LastIP represents the last host IP in the subnet.
+    LastIP net.IP
+
+    // TotalHosts represents the total number of hosts in the subnet.
+    TotalHosts int
+    // contains filtered or unexported fields
+}
+```
+
+<a name="NewSubnetHostsIterator"></a>
+### func NewSubnetHostsIterator
+
+```go
+func NewSubnetHostsIterator(ipNet *net.IPNet) *SubnetHostsIterator
+```
+
+NewSubnetHostsIterator creates a new SubnetHostsIterator for the given IP network. It initializes the iterator with the first and last host IPs, the IP network, the current IP, and the total number of hosts in the subnet.
+
+<a name="NewSubnetHostsIteratorFromCIDRString"></a>
+### func NewSubnetHostsIteratorFromCIDRString
+
+```go
+func NewSubnetHostsIteratorFromCIDRString(cidr string) (*SubnetHostsIterator, error)
+```
+
+NewSubnetHostsIteratorFromCIDRString creates a new SubnetHostsIterator for the given CIDR string. It parses the CIDR string, creates an IP network, and initializes the iterator with the necessary values.
+
+<a name="SubnetHostsIterator.Next"></a>
+### func \(\*SubnetHostsIterator\) Next
+
+```go
+func (it *SubnetHostsIterator) Next() *net.IP
+```
+
+Next returns the next host IP in the subnet. It locks the iterator for thread\-safety. If it's the first call to Next, it returns the first host IP in the subnet. If there are no more hosts in the subnet or if the current IP is outside the subnet, it returns nil.
 
 Generated by [gomarkdoc](<https://github.com/princjef/gomarkdoc>)
