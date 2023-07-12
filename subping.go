@@ -39,7 +39,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/fadhilyori/subping/pkg/network"
-	"github.com/go-ping/ping"
+	ping "github.com/prometheus-community/pro-bing"
 )
 
 // Subping is a utility for concurrently pinging multiple IP addresses and collecting the results.
