@@ -8,7 +8,11 @@ devices within a network by systematically pinging each IP address within the de
 
 Subping depends on the following third-party libraries:
 
-- **go-ping**: https://github.com/go-ping/ping
+- **pro-bing** : https://github.com/prometheus-community/pro-bing
+- **go-figure** : https://github.com/common-nighthawk/go-figure
+- **cobra** : https://github.com/spf13/cobra
+- **logrush** : https://github.com/sirupsen/logrus
+- **network** : https://github.com/fadhilyori/subping/pkg/network
 
 ## Documentation
 
@@ -45,6 +49,18 @@ The following flags are available for the `subping` command:
 - `--offline`: Specify whether to display the list of offline hosts.
 - `-t, --timeout string`: Specifies the maximum ping timeout duration for each ping request. (default "80ms")
 - `-v, --version`: Displays the version information for `subping`.
+
+## Examples
+
+Here are a few examples of how to use subping:
+
+Ping all IP addresses in the subnet range 172.17.0.0/24:
+
+```shell
+subping -t 300ms -c 3 -n 100 172.17.0.0/24
+```
+
+![](assets/images/usage-example.png?raw=true)
 
 ## Import as Go Package
 
@@ -117,18 +133,6 @@ This will initiate the ICMP ping operations on the specified IP addresses.
     ```
 
     The `stats` variable will contain the ping statistics for the specified IP address.
-
-## Examples
-
-Here are a few examples of how to use subping:
-
-Ping all IP addresses in the subnet range 172.17.0.0/24:
-
-```shell
-subping -t 300ms -c 3 -n 100 172.17.0.0/24
-```
-
-![](assets/images/usage-example.png?raw=true)
 
 ## Contributing
 
