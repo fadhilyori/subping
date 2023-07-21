@@ -18,7 +18,7 @@ var (
 	pingTimeoutStr      string
 	pingIntervalStr     string
 	pingMaxWorkers      int
-	subpingVersion      = "latest"
+	subpingVersion      = "dev"
 	showOfflineHostList bool
 )
 
@@ -89,16 +89,17 @@ func runSubping(_ *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("Network        : %s\n", s.TargetsIterator.IPNet.String())
-	fmt.Printf("IP Ranges      : %s - %s\n", s.TargetsIterator.FirstIP.String(), s.TargetsIterator.LastIP.String())
+	fmt.Printf("IP Ranges      : %s - %s\n",
+		s.TargetsIterator.FirstIP.String(), s.TargetsIterator.LastIP.String(),
+	)
 	fmt.Printf("Total hosts    : %d\n", s.TargetsIterator.TotalHosts)
 	fmt.Printf("Total workers  : %d\n", s.MaxWorkers)
 	fmt.Printf("Count          : %d\n", s.Count)
 	fmt.Printf("Interval       : %s\n", s.Interval.String())
-	fmt.Printf("Timeout        : %s\n", s.Timeout.String())
-	fmt.Println(`--------------------------------------------------------`)
-	fmt.Println("| IP Address       | Avg Latency      | Packet Loss    |")
-	fmt.Println(`--------------------------------------------------------`)
-	fmt.Printf("Pinging...")
+	fmt.Printf("Timeout        : %s\n", pingTimeoutStr)
+	fmt.Println(`-------------------------------------------------------------------------------`)
+	fmt.Printf("| %-39s | %-16s | %-14s |\n", "IP Address", "Avg Latency", "Packet Loss")
+	fmt.Println(`-------------------------------------------------------------------------------`)
 
 	s.Run()
 
@@ -115,24 +116,27 @@ func runSubping(_ *cobra.Command, args []string) {
 		return bytes.Compare(keys[i].To16(), keys[j].To16()) < 0
 	})
 
-	fmt.Print("\r")
-
 	for _, ip := range keys {
 		// convert bytes to string in each line of IP
 		ipString := ip.String()
 		stats := results[ipString]
 		packetLossPercentageStr := fmt.Sprintf("%.2f %%", stats.PacketLoss)
 
-		fmt.Printf("| %-16s | %-16s | %-14s |\n", ipString, stats.AvgRtt.String(), packetLossPercentageStr)
+		fmt.Printf(
+			"| %-39s | %-16s | %-14s |\n",
+			ipString, stats.AvgRtt.String(), packetLossPercentageStr)
 	}
 
-	fmt.Println(`--------------------------------------------------------`)
+	fmt.Println(`-------------------------------------------------------------------------------`)
 
 	if showOfflineHostList {
 		fmt.Println("\nOffline hosts :")
 		for ip, stats := range s.Results {
 			if stats.PacketsRecv == 0 {
-				fmt.Printf(" - %s\t(Loss: %s, Latency: %s)\n", ip, fmt.Sprintf("%.2f %%", stats.PacketLoss), stats.AvgRtt.String())
+				fmt.Printf(
+					" - %s\t(Loss: %s, Latency: %s)\n",
+					ip, fmt.Sprintf("%.2f %%", stats.PacketLoss), stats.AvgRtt.String(),
+				)
 			}
 		}
 	}
