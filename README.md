@@ -12,12 +12,12 @@ Subping depends on the following third-party libraries:
 
 ## Documentation
 
-The documentation for the Subping library can be found in the [docs](docs/) directory. It includes detailed information on how to use the library, examples, and API references.
+The documentation for the Subping library can be found at https://pkg.go.dev/github.com/fadhilyori/subping. It includes detailed information on how to use the library, and examples.
 
 The library consists of the following packages:
 
-- **[github.com/fadhilyori/subping](docs/)**: The main package that provides the Subping struct and related functionalities.
-- **[github.com/fadhilyori/subping/pkg/network](docs/network)**: A subpackage that offers network-related utilities for working with IP addresses and subnet ranges.
+- **[github.com/fadhilyori/subping](https://pkg.go.dev/github.com/fadhilyori/subping)**: The main package that provides the Subping struct and related functionalities.
+- **[github.com/fadhilyori/subping/pkg/network](https://pkg.go.dev/github.com/fadhilyori/subping/pkg/network)**: A subpackage that offers network-related utilities for working with IP addresses and subnet ranges.
 
 Please refer to the documentation for the respective packages to understand how to use them in your applications.
 
@@ -45,6 +45,7 @@ The following flags are available for the `subping` command:
 - `--offline`: Specify whether to display the list of offline hosts.
 - `-t, --timeout string`: Specifies the maximum ping timeout duration for each ping request. (default "80ms")
 - `-v, --version`: Displays the version information for `subping`.
+
 
 ## Import as Go Package
 
