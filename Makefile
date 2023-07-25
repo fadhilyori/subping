@@ -3,9 +3,14 @@ CGO_ENABLED=0
 VERSION=$(shell git describe --tags --abbrev=0)
 BUILD_FLAGS="-w -s -X main.subpingVersion=$(VERSION)"
 PLATFORMS = linux/amd64 linux/386 linux/arm64 linux/arm windows/amd64 windows/386 windows/arm64 windows/arm
+LINUX_PATFORMS=$(filter-out windows/%, $(PLATFORMS))
+IMAGE_NAME=ghcr.io/fadhilyori/subping:latest
 
 build:
 	go build -ldflags=$(BUILD_FLAGS) -o out/$(BINARY_NAME) ./cmd/subping/
+
+build-docker:
+	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE_NAME) .
 
 build-all:
 	mkdir -p out
