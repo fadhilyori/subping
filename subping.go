@@ -33,6 +33,7 @@ package subping
 import (
 	"errors"
 	"log"
+	"runtime"
 	"sync"
 	"time"
 
@@ -255,8 +256,13 @@ func RunPing(ipAddress string, count int, interval time.Duration, timeout time.D
 		pinger.Timeout = timeout
 	}
 
+	if runtime.GOOS == "windows" {
+		pinger.SetPrivileged(true)
+	}
+
 	err = pinger.Run()
 	if err != nil {
+		logrus.Printf("Failed to ping the address %s, %v\n", ipAddress, err.Error())
 		return ping.Statistics{}
 	}
 
