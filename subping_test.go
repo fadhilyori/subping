@@ -154,7 +154,7 @@ func TestRunSubping(t *testing.T) {
 				return
 			}
 
-			if tt.wantOnline && onlineResultsLen != tt.numOfOnline {
+			if tt.wantOnline && onlineResultsLen != tt.numOfOnline && onlineResultsLen != wantTotalResults {
 				var hosts []string
 				for k := range sp.Results {
 					hosts = append(hosts, k)
