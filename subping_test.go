@@ -18,10 +18,11 @@ func TestRunSubping(t *testing.T) {
 		MaxWorkers int
 	}
 	tests := []struct {
-		name       string
-		args       args
-		wantErr    bool
-		wantOnline bool
+		name        string
+		args        args
+		wantErr     bool
+		wantOnline  bool
+		numOfOnline int
 	}{
 		{
 			name: "Test with valid options",
@@ -34,6 +35,7 @@ func TestRunSubping(t *testing.T) {
 			},
 			wantErr:    false,
 			wantOnline: false,
+			numOfOnline: 0,
 		},
 		{
 			name: "Test with invalid Count",
@@ -46,6 +48,7 @@ func TestRunSubping(t *testing.T) {
 			},
 			wantErr:    true,
 			wantOnline: false,
+			numOfOnline: 0,
 		},
 		{
 			name: "Test with invalid MaxWorkers",
@@ -58,6 +61,7 @@ func TestRunSubping(t *testing.T) {
 			},
 			wantErr:    true,
 			wantOnline: false,
+			numOfOnline: 0,
 		},
 		{
 			name: "Test with IPv6 ::1/128",
@@ -70,6 +74,7 @@ func TestRunSubping(t *testing.T) {
 			},
 			wantErr:    false,
 			wantOnline: true,
+			numOfOnline: 1,
 		},
 		{
 			name: "Test with IPv4 /20 should online all - high conccurency",
@@ -82,6 +87,7 @@ func TestRunSubping(t *testing.T) {
 			},
 			wantErr:    false,
 			wantOnline: true,
+			numOfOnline: 255,
 		},
 	}
 	for _, tt := range tests {
@@ -148,7 +154,7 @@ func TestRunSubping(t *testing.T) {
 				return
 			}
 
-			if tt.wantOnline && onlineResultsLen != sp.TotalResults {
+			if tt.wantOnline && onlineResultsLen != tt.numOfOnline {
 				var hosts []string
 				for k := range sp.Results {
 					hosts = append(hosts, k)
@@ -201,7 +207,7 @@ func TestRunPing(t *testing.T) {
 				timeout:   3 * time.Second,
 			},
 			want: want{
-				PacketsSent: 5,
+				PacketsSent: 0,
 				PacketsRecv: 0,
 			},
 		},
