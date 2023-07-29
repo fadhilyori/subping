@@ -98,7 +98,7 @@ func TestRunSubping(t *testing.T) {
 				Interval:   tt.args.Interval,
 				Timeout:    tt.args.Timeout,
 				MaxWorkers: tt.args.MaxWorkers,
-				LogLevel:   "debug",
+				LogLevel:   "error",
 			})
 			if err != nil {
 				if !tt.wantErr {
@@ -160,7 +160,7 @@ func TestRunSubping(t *testing.T) {
 					hosts = append(hosts, k)
 				}
 
-				t.Errorf("Subping.Results length online hosts is invalid => got %v, want %v, wantErr %v\nOffline: %v", onlineResultsLen, wantTotalResults, tt.wantErr, hosts)
+				t.Errorf("Subping.Results length online hosts is invalid => got %v, want %v, wantErr %v\n", onlineResultsLen, tt.numOfOnline, tt.wantErr)
 				return
 			}
 		})
