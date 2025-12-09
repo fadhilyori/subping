@@ -99,7 +99,7 @@ type Options struct {
 // NewSubping creates a new Subping instance with the provided options.
 func NewSubping(opts *Options) (*Subping, error) {
 	if opts.Subnet == "" {
-		return nil, errors.New("subnet should be in CIDR notation and cannot empty")
+		return nil, errors.New("subnet should be in CIDR notation and cannot be empty")
 	}
 
 	if opts.Count < 1 {
@@ -149,7 +149,7 @@ func NewSubping(opts *Options) (*Subping, error) {
 // This allows dependency injection for testing or special use cases
 func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 	if opts.Subnet == "" {
-		return nil, errors.New("subnet should be in CIDR notation and cannot empty")
+		return nil, errors.New("subnet should be in CIDR notation and cannot be empty")
 	}
 
 	if opts.Count < 1 {
