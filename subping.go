@@ -110,6 +110,14 @@ func NewSubping(opts *Options) (*Subping, error) {
 		return nil, errors.New("max workers should be more than zero (0)")
 	}
 
+	if opts.Timeout < 0 {
+		return nil, errors.New("timeout cannot be negative")
+	}
+
+	if opts.Interval < 0 {
+		return nil, errors.New("interval cannot be negative")
+	}
+
 	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse subnet: %w", err)
@@ -158,6 +166,14 @@ func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 
 	if opts.MaxWorkers < 1 {
 		return nil, errors.New("max workers should be more than zero (0)")
+	}
+
+	if opts.Timeout < 0 {
+		return nil, errors.New("timeout cannot be negative")
+	}
+
+	if opts.Interval < 0 {
+		return nil, errors.New("interval cannot be negative")
 	}
 
 	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)

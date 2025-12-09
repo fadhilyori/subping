@@ -81,6 +81,45 @@ func TestRunSubping(t *testing.T) {
 			numOfOnline: 0,
 		},
 		{
+			name: "Test with invalid negative Timeout",
+			args: args{
+				CIDR:       "127.0.0.0/29",
+				Count:      1,
+				Timeout:    -1 * time.Second,
+				Interval:   300 * time.Millisecond,
+				MaxWorkers: 2,
+			},
+			wantErr:    true,
+			wantOnline: false,
+			numOfOnline: 0,
+		},
+		{
+			name: "Test with invalid negative Interval",
+			args: args{
+				CIDR:       "127.0.0.0/29",
+				Count:      1,
+				Timeout:    1 * time.Second,
+				Interval:   -300 * time.Millisecond,
+				MaxWorkers: 2,
+			},
+			wantErr:    true,
+			wantOnline: false,
+			numOfOnline: 0,
+		},
+		{
+			name: "Test with both negative Timeout and Interval",
+			args: args{
+				CIDR:       "127.0.0.0/29",
+				Count:      1,
+				Timeout:    -2 * time.Second,
+				Interval:   -500 * time.Millisecond,
+				MaxWorkers: 2,
+			},
+			wantErr:    true,
+			wantOnline: false,
+			numOfOnline: 0,
+		},
+		{
 			name: "Test with IPv6 ::1/128",
 			args: args{
 				CIDR:       "::1/128",
