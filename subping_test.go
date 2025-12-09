@@ -1,6 +1,7 @@
 package subping_test
 
 import (
+	"os"
 	"sort"
 	"testing"
 	"time"
@@ -8,6 +9,22 @@ import (
 	"github.com/fadhilyori/subping"
 	"github.com/fadhilyori/subping/pkg/network"
 )
+
+// TestMain sets up the test environment
+// We force CI=true to ensure mock pinger is used for reliable testing
+func TestMain(m *testing.M) {
+	// Set CI environment variable to force mock pinger usage
+	// This ensures tests run reliably without requiring network privileges
+	os.Setenv("CI", "true")
+
+	// Run tests
+	code := m.Run()
+
+	// Clean up
+	os.Unsetenv("CI")
+
+	os.Exit(code)
+}
 
 func TestRunSubping(t *testing.T) {
 	type args struct {

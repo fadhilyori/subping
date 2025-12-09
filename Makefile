@@ -9,6 +9,14 @@ IMAGE_NAME=ghcr.io/fadhilyori/subping:latest
 build:
 	go build -ldflags=$(BUILD_FLAGS) -o out/$(BINARY_NAME) ./cmd/subping/
 
+test:
+	go test -v ./...
+
+test-mock:
+	CI=true go test -v ./...
+
+.PHONY: build test test-mock build-docker build-all
+
 build-docker:
 	docker build --build-arg VERSION=$(VERSION) -t $(IMAGE_NAME) .
 
