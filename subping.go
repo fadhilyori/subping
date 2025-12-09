@@ -32,7 +32,7 @@ package subping
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -99,7 +99,7 @@ type Options struct {
 // NewSubping creates a new Subping instance with the provided options.
 func NewSubping(opts *Options) (*Subping, error) {
 	if opts.Subnet == "" {
-		return nil, errors.New("subnet should be in CIDR notation and cannot empty")
+		return nil, errors.New("subnet should be in CIDR notation and cannot be empty")
 	}
 
 	if opts.Count < 1 {
@@ -112,7 +112,7 @@ func NewSubping(opts *Options) (*Subping, error) {
 
 	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)
 	if err != nil {
-		log.Fatal(err.Error())
+		return nil, fmt.Errorf("failed to parse subnet: %w", err)
 	}
 
 	batchLimit, err := calculateMaxPartitionSize(ips.TotalHosts, opts.MaxWorkers)
@@ -126,7 +126,7 @@ func NewSubping(opts *Options) (*Subping, error) {
 
 	logLevel, err := logrus.ParseLevel(opts.LogLevel)
 	if err != nil {
-		return nil, errors.New("max workers should be more than zero (0)")
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
 
 	instance := &Subping{
@@ -149,7 +149,7 @@ func NewSubping(opts *Options) (*Subping, error) {
 // This allows dependency injection for testing or special use cases
 func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 	if opts.Subnet == "" {
-		return nil, errors.New("subnet should be in CIDR notation and cannot empty")
+		return nil, errors.New("subnet should be in CIDR notation and cannot be empty")
 	}
 
 	if opts.Count < 1 {
@@ -162,7 +162,7 @@ func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 
 	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)
 	if err != nil {
-		log.Fatal(err.Error())
+		return nil, fmt.Errorf("failed to parse subnet: %w", err)
 	}
 
 	batchLimit, err := calculateMaxPartitionSize(ips.TotalHosts, opts.MaxWorkers)
@@ -176,7 +176,7 @@ func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 
 	logLevel, err := logrus.ParseLevel(opts.LogLevel)
 	if err != nil {
-		return nil, errors.New("max workers should be more than zero (0)")
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
 
 	instance := &Subping{
