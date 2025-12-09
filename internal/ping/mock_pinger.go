@@ -71,6 +71,13 @@ func (p *mockPinger) Ping(ipAddress string, count int, interval time.Duration, t
 		time.Sleep(1 * time.Millisecond) // Minimal delay to simulate network operation
 	}
 
+	// Validate IP address first
+	ip := net.ParseIP(ipAddress)
+	if ip == nil && ipAddress != "localhost" {
+		// Invalid IP address should return an error
+		return Result{}, errors.New("invalid IP address")
+	}
+
 	// Check for host-specific configuration first
 	if hostConfig, exists := p.config.HostConfigs[ipAddress]; exists {
 		if hostConfig.ShouldError {
@@ -129,9 +136,16 @@ func (p *mockPinger) calculateResult(count int, latency time.Duration, packetLos
 
 // isLocalhost checks if the IP address is localhost
 func (p *mockPinger) isLocalhost(ipAddress string) bool {
+	ip := net.ParseIP(ipAddress)
+	if ip == nil {
+		return ipAddress == "localhost"
+	}
+
+	// Check for localhost equivalents
 	return ipAddress == "localhost" ||
 		   ipAddress == "127.0.0.1" ||
-		   ipAddress == "::1"
+		   ipAddress == "::1" ||
+		   ip.IsLoopback()
 }
 
 // isPrivateIP checks if the IP address is in a private range

@@ -103,8 +103,8 @@ func isCIEnvironment() bool {
 // standalone RunPing function but uses our internal pinger abstraction.
 // It sends the specified number of ping requests with the given interval and timeout.
 func RunPing(ipAddress string, count int, interval time.Duration, timeout time.Duration) Statistics {
-	// Use the real pinger for this utility function
-	pinger := NewRealPinger()
+	// Use the auto-detecting pinger to respect CI environment
+	pinger := NewPinger()
 
 	result, err := pinger.Ping(ipAddress, count, interval, timeout)
 	if err != nil {
