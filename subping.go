@@ -33,14 +33,13 @@ package subping
 import (
 	"errors"
 	"log"
-	"runtime"
 	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/fadhilyori/subping/internal/ping"
 	"github.com/fadhilyori/subping/pkg/network"
-	ping "github.com/prometheus-community/pro-bing"
 )
 
 // Subping is a utility for concurrently pinging multiple IP addresses and collecting the results.
@@ -61,13 +60,16 @@ type Subping struct {
 	BatchSize int64
 
 	// Results stores the ping results for each target IP address.
-	Results map[string]Result
+	Results map[string]ping.Result
 
 	// TotalResults represents the total number of ping results collected.
 	TotalResults int
 
 	// MaxWorkers specifies the maximum number of concurrent workers to use.
 	MaxWorkers int
+
+	// pinger is the ping implementation (real or mock)
+	pinger ping.Pinger
 
 	logger *logrus.Logger
 }
@@ -93,23 +95,6 @@ type Options struct {
 	MaxWorkers int
 }
 
-// Result contains the statistics and metrics for a single ping operation.
-type Result struct {
-	// AvgRtt is the average round-trip time of the ping requests.
-	AvgRtt time.Duration
-
-	// PacketLoss is the percentage of packets lost during the ping operation.
-	PacketLoss float64
-
-	// PacketsSent is the number of packets sent for the ping operation.
-	PacketsSent int
-
-	// PacketsRecv is the number of packets received for the ping operation.
-	PacketsRecv int
-
-	// PacketsRecvDuplicates is the number of duplicate packets received.
-	PacketsRecvDuplicates int
-}
 
 // NewSubping creates a new Subping instance with the provided options.
 func NewSubping(opts *Options) (*Subping, error) {
@@ -151,6 +136,57 @@ func NewSubping(opts *Options) (*Subping, error) {
 		Timeout:         opts.Timeout,
 		BatchSize:       int64(batchLimit),
 		MaxWorkers:      opts.MaxWorkers,
+		pinger:          ping.NewPinger(), // Auto-detect based on environment
+		logger:          logrus.New(),
+	}
+
+	instance.logger.SetLevel(logLevel)
+
+	return instance, nil
+}
+
+// NewSubpingWithPinger creates a new Subping instance with a custom pinger implementation
+// This allows dependency injection for testing or special use cases
+func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
+	if opts.Subnet == "" {
+		return nil, errors.New("subnet should be in CIDR notation and cannot empty")
+	}
+
+	if opts.Count < 1 {
+		return nil, errors.New("count should be more than zero (0)")
+	}
+
+	if opts.MaxWorkers < 1 {
+		return nil, errors.New("max workers should be more than zero (0)")
+	}
+
+	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	batchLimit, err := calculateMaxPartitionSize(ips.TotalHosts, opts.MaxWorkers)
+	if err != nil {
+		return nil, err
+	}
+
+	if opts.LogLevel == "" {
+		opts.LogLevel = "error"
+	}
+
+	logLevel, err := logrus.ParseLevel(opts.LogLevel)
+	if err != nil {
+		return nil, errors.New("max workers should be more than zero (0)")
+	}
+
+	instance := &Subping{
+		TargetsIterator: ips,
+		Count:           opts.Count,
+		Interval:        opts.Interval,
+		Timeout:         opts.Timeout,
+		BatchSize:       int64(batchLimit),
+		MaxWorkers:      opts.MaxWorkers,
+		pinger:          pinger, // Use the provided pinger
 		logger:          logrus.New(),
 	}
 
@@ -194,10 +230,10 @@ func (s *Subping) Run() {
 	wg.Wait()
 
 	s.logger.Debugln("All workers already stopped. Storing the results.")
-	s.Results = make(map[string]Result)
+	s.Results = make(map[string]ping.Result)
 
 	syncMap.Range(func(key, value any) bool {
-		s.Results[key.(string)] = value.(Result)
+		s.Results[key.(string)] = value.(ping.Result)
 
 		return true
 	})
@@ -213,14 +249,14 @@ func (s *Subping) startWorker(id int64, wg *sync.WaitGroup, sm *sync.Map, c <-ch
 	for target := range c {
 		s.logger.WithField("worker", id).Tracef("Got task %s.\n", target)
 
-		p := RunPing(target, s.Count, s.Interval, s.Timeout)
-		sm.Store(target, Result{
-			AvgRtt:                p.AvgRtt,
-			PacketLoss:            p.PacketLoss,
-			PacketsSent:           p.PacketsSent,
-			PacketsRecv:           p.PacketsRecv,
-			PacketsRecvDuplicates: p.PacketsRecvDuplicates,
-		})
+		p, err := s.pinger.Ping(target, s.Count, s.Interval, s.Timeout)
+		if err != nil {
+			s.logger.WithField("worker", id).Debugf("Ping failed for %s: %v", target, err)
+			// Store empty result for failed pings
+			p = ping.Result{}
+		}
+
+		sm.Store(target, p)
 
 		time.Sleep(s.Interval)
 	}
@@ -228,8 +264,8 @@ func (s *Subping) startWorker(id int64, wg *sync.WaitGroup, sm *sync.Map, c <-ch
 
 // GetOnlineHosts returns a map of online hosts and their corresponding ping results,
 // as well as the total number of online hosts.
-func (s *Subping) GetOnlineHosts() (map[string]Result, int) {
-	r := make(map[string]Result)
+func (s *Subping) GetOnlineHosts() (map[string]ping.Result, int) {
+	r := make(map[string]ping.Result)
 
 	for ip, stats := range s.Results {
 		if stats.PacketsRecv > 0 {
@@ -242,31 +278,9 @@ func (s *Subping) GetOnlineHosts() (map[string]Result, int) {
 
 // RunPing performs a ping operation to the specified IP address.
 // It sends the specified number of ping requests with the given interval and timeout.
+// This function delegates to the internal ping package for implementation.
 func RunPing(ipAddress string, count int, interval time.Duration, timeout time.Duration) ping.Statistics {
-	pinger, err := ping.NewPinger(ipAddress)
-	if err != nil {
-		logrus.Printf("Failed to create pinger for IP Address: %s\n", ipAddress)
-		return ping.Statistics{}
-	}
-
-	pinger.Count = count
-	pinger.Interval = interval
-
-	if timeout > 0 {
-		pinger.Timeout = timeout
-	}
-
-	if runtime.GOOS == "windows" {
-		pinger.SetPrivileged(true)
-	}
-
-	err = pinger.Run()
-	if err != nil {
-		logrus.Printf("Failed to ping the address %s, %v\n", ipAddress, err.Error())
-		return ping.Statistics{}
-	}
-
-	return *pinger.Statistics()
+	return ping.RunPing(ipAddress, count, interval, timeout)
 }
 
 // calculateMaxPartitionSize calculates the maximum size of each partition given the total data size and the desired number of partitions.
