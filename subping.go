@@ -32,7 +32,7 @@ package subping
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
@@ -112,7 +112,7 @@ func NewSubping(opts *Options) (*Subping, error) {
 
 	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)
 	if err != nil {
-		log.Fatal(err.Error())
+		return nil, fmt.Errorf("failed to parse subnet: %w", err)
 	}
 
 	batchLimit, err := calculateMaxPartitionSize(ips.TotalHosts, opts.MaxWorkers)
@@ -162,7 +162,7 @@ func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 
 	ips, err := network.NewSubnetHostsIteratorFromCIDRString(opts.Subnet)
 	if err != nil {
-		log.Fatal(err.Error())
+		return nil, fmt.Errorf("failed to parse subnet: %w", err)
 	}
 
 	batchLimit, err := calculateMaxPartitionSize(ips.TotalHosts, opts.MaxWorkers)
