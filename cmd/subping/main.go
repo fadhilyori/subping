@@ -80,7 +80,7 @@ func runSubping(_ *cobra.Command, args []string) {
 		Subnet:     subnetString,
 		Count:      pingCount,
 		Interval:   pingInterval,
-		Timeout:    pingTimeout * time.Duration(pingCount),
+		Timeout:    pingTimeout,
 		MaxWorkers: pingMaxWorkers,
 		LogLevel:   "error",
 	})
