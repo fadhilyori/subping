@@ -68,12 +68,12 @@ func runSubping(_ *cobra.Command, args []string) {
 
 	pingTimeout, err := time.ParseDuration(pingTimeoutStr)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("Invalid timeout format '%s': %v\nValid examples: 1s, 500ms, 1m30s", pingTimeoutStr, err)
 	}
 
 	pingInterval, err := time.ParseDuration(pingIntervalStr)
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Fatalf("Invalid interval format '%s': %v\nValid examples: 300ms, 1s, 2s", pingIntervalStr, err)
 	}
 
 	s, err := subping.NewSubping(&subping.Options{
