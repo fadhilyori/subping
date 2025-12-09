@@ -223,7 +223,7 @@ func (s *Subping) Run() {
 		wg sync.WaitGroup
 
 		// jobChannel to distribute tasks to workers.
-		jobChannel = make(chan string, s.BatchSize)
+		jobChannel = make(chan string, s.MaxWorkers*2)
 	)
 
 	// Spawn the worker goroutines.
@@ -246,7 +246,7 @@ func (s *Subping) Run() {
 	wg.Wait()
 
 	s.logger.Debugln("All workers already stopped. Storing the results.")
-	s.Results = make(map[string]ping.Result)
+	s.Results = make(map[string]ping.Result, s.TargetsIterator.TotalHosts)
 
 	syncMap.Range(func(key, value any) bool {
 		s.Results[key.(string)] = value.(ping.Result)
@@ -273,8 +273,6 @@ func (s *Subping) startWorker(id int64, wg *sync.WaitGroup, sm *sync.Map, c <-ch
 		}
 
 		sm.Store(target, p)
-
-		time.Sleep(s.Interval)
 	}
 }
 

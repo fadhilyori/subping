@@ -282,3 +282,118 @@ func TestRunPing(t *testing.T) {
 		})
 	}
 }
+
+// BenchmarkSubpingPerformance benchmarks the performance of Subping with various subnet sizes
+func BenchmarkSubpingPerformance(b *testing.B) {
+	tests := []struct {
+		name       string
+		cidr       string
+		maxWorkers int
+		count      int
+		interval   time.Duration
+		timeout    time.Duration
+	}{
+		{
+			name:       "Small subnet /28",
+			cidr:       "127.0.0.0/28",
+			maxWorkers: 4,
+			count:      1,
+			interval:   100 * time.Millisecond,
+			timeout:    500 * time.Millisecond,
+		},
+		{
+			name:       "Medium subnet /24",
+			cidr:       "127.0.0.0/24",
+			maxWorkers: 32,
+			count:      1,
+			interval:   100 * time.Millisecond,
+			timeout:    500 * time.Millisecond,
+		},
+		{
+			name:       "Large subnet /20",
+			cidr:       "127.0.0.0/20",
+			maxWorkers: 64,
+			count:      1,
+			interval:   100 * time.Millisecond,
+			timeout:    500 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			s, err := subping.NewSubping(&subping.Options{
+				Subnet:     tt.cidr,
+				Count:      tt.count,
+				Interval:   tt.interval,
+				Timeout:    tt.timeout,
+				MaxWorkers: tt.maxWorkers,
+				LogLevel:   "error",
+			})
+			if err != nil {
+				b.Fatalf("Failed to create Subping: %v", err)
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				s.Results = nil // Reset results
+				s.Run()
+			}
+		})
+	}
+}
+
+// BenchmarkChannelBufferSize compares different channel buffer sizes
+func BenchmarkChannelBufferSize(b *testing.B) {
+	// This benchmark demonstrates the impact of channel buffer size optimization
+	s, err := subping.NewSubping(&subping.Options{
+		Subnet:     "127.0.0.0/24",
+		Count:      1,
+		Interval:   100 * time.Millisecond,
+		Timeout:    500 * time.Millisecond,
+		MaxWorkers: 128,
+		LogLevel:   "error",
+	})
+	if err != nil {
+		b.Fatalf("Failed to create Subping: %v", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s.Results = nil // Reset results
+		s.Run()
+	}
+}
+
+// BenchmarkResultsMapAllocation benchmarks the results map allocation performance
+func BenchmarkResultsMapAllocation(b *testing.B) {
+	sizes := []struct {
+		name string
+		cidr string
+	}{
+		{"Small", "127.0.0.0/28"},
+		{"Medium", "127.0.0.0/24"},
+		{"Large", "127.0.0.0/20"},
+	}
+
+	for _, size := range sizes {
+		b.Run(size.name, func(b *testing.B) {
+			s, err := subping.NewSubping(&subping.Options{
+				Subnet:     size.cidr,
+				Count:      1,
+				Interval:   100 * time.Millisecond,
+				Timeout:    500 * time.Millisecond,
+				MaxWorkers: 64,
+				LogLevel:   "error",
+			})
+			if err != nil {
+				b.Fatalf("Failed to create Subping: %v", err)
+			}
+
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				s.Results = nil // Reset results
+				s.Run()
+			}
+		})
+	}
+}
