@@ -126,7 +126,7 @@ func NewSubping(opts *Options) (*Subping, error) {
 
 	logLevel, err := logrus.ParseLevel(opts.LogLevel)
 	if err != nil {
-		return nil, errors.New("max workers should be more than zero (0)")
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
 
 	instance := &Subping{
@@ -176,7 +176,7 @@ func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 
 	logLevel, err := logrus.ParseLevel(opts.LogLevel)
 	if err != nil {
-		return nil, errors.New("max workers should be more than zero (0)")
+		return nil, fmt.Errorf("failed to parse log level: %w", err)
 	}
 
 	instance := &Subping{
