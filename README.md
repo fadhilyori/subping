@@ -47,7 +47,7 @@ The following flags are available for the `subping` command:
 - `-i, --interval string`: Specifies the time duration between each ping request. (default "300ms")
 - `-n, --job int`: Specifies the number of maximum concurrent jobs spawned to perform ping operations. (default 128)
 - `--offline`: Specify whether to display the list of offline hosts.
-- `-t, --timeout string`: Specifies the maximum ping timeout duration for each ping request. (default "80ms")
+- `-t, --timeout string`: Specifies the maximum ping timeout duration for each ping request. (default "1s")
 - `-v, --version`: Displays the version information for `subping`.
 
 ## Examples

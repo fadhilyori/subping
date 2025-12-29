@@ -1,15 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"log"
-	"net"
-	"sort"
 	"time"
 
 	"github.com/common-nighthawk/go-figure"
 	"github.com/fadhilyori/subping"
+	"github.com/fadhilyori/subping/internal/display"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +18,7 @@ var (
 	pingMaxWorkers      int
 	subpingVersion      = "dev"
 	showOfflineHostList bool
+	sortBy              string
 )
 
 func main() {
@@ -29,11 +28,12 @@ func main() {
 		Short:   "A tool for pinging IP addresses in a subnet",
 		Long:    "Subping is a command-line tool that allows you to ping IP addresses within a specified subnet range.",
 		Args:    cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-		Run:     runSubping,
+		Run: func(cmd *cobra.Command, args []string) {
+			runSubping(cmd, args)
+		},
 		PreRun: func(cmd *cobra.Command, args []string) {
 			figure.NewFigure("subping", "larry3d", true).Print()
-			fmt.Println(cmd.Version)
-			fmt.Print("\n\n")
+			fmt.Print("\n")
 		},
 	}
 
@@ -55,13 +55,16 @@ func main() {
 	flags.BoolVar(&showOfflineHostList, "offline", false,
 		"Specify whether to display the list of offline hosts.",
 	)
+	flags.StringVar(&sortBy, "sort", "ip",
+		"Sort results by: ip, latency, loss, jitter (default: ip)",
+	)
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func runSubping(_ *cobra.Command, args []string) {
+func runSubping(rootCmd *cobra.Command, args []string) {
 	subnetString := args[0]
 
 	startTime := time.Now()
@@ -76,6 +79,29 @@ func runSubping(_ *cobra.Command, args []string) {
 		log.Fatalf("Invalid interval format '%s': %v\nValid examples: 300ms, 1s, 2s", pingIntervalStr, err)
 	}
 
+	sortOption := display.SortByIP
+	switch sortBy {
+	case "latency":
+		sortOption = display.SortByLatency
+	case "loss":
+		sortOption = display.SortByLoss
+	case "jitter":
+		sortOption = display.SortByJitter
+	case "ip":
+		sortOption = display.SortByIP
+	default:
+		log.Fatalf("Invalid sort option '%s'. Valid options: ip, latency, loss, jitter", sortBy)
+	}
+
+	displayConfig := display.DisplayConfig{
+		EnabledColors:          true,
+		EnabledProgress:        true,
+		SortBy:                 sortOption,
+		UseEnhancedHealthScore: true,
+	}
+
+	d := display.NewDisplay(displayConfig)
+
 	s, err := subping.NewSubping(&subping.Options{
 		Subnet:     subnetString,
 		Count:      pingCount,
@@ -83,68 +109,62 @@ func runSubping(_ *cobra.Command, args []string) {
 		Timeout:    pingTimeout,
 		MaxWorkers: pingMaxWorkers,
 		LogLevel:   "error",
+		ProgressCallback: func(current, total int, currentIP string, onlineCount int) {
+			d.UpdateProgress(current, total, currentIP, onlineCount)
+		},
 	})
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	fmt.Printf("Network        : %s\n", s.TargetsIterator.IPNet.String())
-	fmt.Printf("IP Ranges      : %s - %s\n",
-		s.TargetsIterator.FirstIP.String(), s.TargetsIterator.LastIP.String(),
+	d.ShowHeader(
+		s.TargetsIterator.IPNet.String(),
+		fmt.Sprintf("%s - %s", s.TargetsIterator.FirstIP.String(), s.TargetsIterator.LastIP.String()),
+		s.TargetsIterator.TotalHosts,
+		s.MaxWorkers,
+		s.Count,
+		s.Interval.String(),
+		pingTimeoutStr,
+		rootCmd.Version,
 	)
-	fmt.Printf("Total hosts    : %d\n", s.TargetsIterator.TotalHosts)
-	fmt.Printf("Total workers  : %d\n", s.MaxWorkers)
-	fmt.Printf("Count          : %d\n", s.Count)
-	fmt.Printf("Interval       : %s\n", s.Interval.String())
-	fmt.Printf("Timeout        : %s\n", pingTimeoutStr)
-	fmt.Println(`-------------------------------------------------------------------------------`)
-	fmt.Printf("| %-39s | %-16s | %-14s |\n", "IP Address", "Avg Latency", "Packet Loss")
-	fmt.Println(`-------------------------------------------------------------------------------`)
 
 	s.Run()
 
-	results, totalHostOnline := s.GetOnlineHosts()
+	onlineResults, totalHostOnline := s.GetOnlineHosts()
 
-	// Extract keys into a slice
-	keys := make([]net.IP, 0, len(results))
-	for key := range results {
-		keys = append(keys, net.ParseIP(key))
+	// Calculate proper capacity based on what we'll actually store
+	var estimatedCapacity int
+	if showOfflineHostList {
+		estimatedCapacity = s.TargetsIterator.TotalHosts // All hosts (online + offline)
+	} else {
+		estimatedCapacity = totalHostOnline // Only online hosts
 	}
 
-	// Sort the keys Based on byte comparison
-	sort.Slice(keys, func(i, j int) bool {
-		return bytes.Compare(keys[i].To16(), keys[j].To16()) < 0
-	})
+	allResults := make([]display.HostResult, 0, estimatedCapacity)
 
-	for _, ip := range keys {
-		// convert bytes to string in each line of IP
-		ipString := ip.String()
-		stats := results[ipString]
-		packetLossPercentageStr := fmt.Sprintf("%.2f %%", stats.PacketLoss)
-
-		fmt.Printf(
-			"| %-39s | %-16s | %-14s |\n",
-			ipString, stats.AvgRtt.String(), packetLossPercentageStr)
+	for ip, result := range onlineResults {
+		allResults = append(allResults, display.ConvertPingResult(ip, result))
 	}
-
-	fmt.Println(`-------------------------------------------------------------------------------`)
 
 	if showOfflineHostList {
-		fmt.Println("\nOffline hosts :")
-		for ip, stats := range s.Results {
-			if stats.PacketsRecv == 0 {
-				fmt.Printf(
-					" - %s\t(Loss: %s, Latency: %s)\n",
-					ip, fmt.Sprintf("%.2f %%", stats.PacketLoss), stats.AvgRtt.String(),
-				)
+		for ip, result := range s.Results {
+			if result.PacketsRecv == 0 {
+				allResults = append(allResults, display.ConvertPingResult(ip, result))
 			}
 		}
 	}
 
+	d.ShowResults(allResults)
+
 	elapsed := time.Since(startTime)
 	totalHostOffline := s.TargetsIterator.TotalHosts - totalHostOnline
 
-	fmt.Printf("\nTotal Hosts Online  : %d\n", totalHostOnline)
-	fmt.Printf("Total Hosts Offline : %d\n", totalHostOffline)
-	fmt.Printf("Execution time      : %s\n\n", elapsed.String())
+	var scanRate float64
+	if elapsed.Seconds() > 0 {
+		scanRate = float64(s.TargetsIterator.TotalHosts) / elapsed.Seconds()
+	}
+
+	d.ShowSummary(s.TargetsIterator.TotalHosts, totalHostOnline, totalHostOffline, elapsed, scanRate)
 }
+
+// Avoid to ping with 0.0.0.0/0

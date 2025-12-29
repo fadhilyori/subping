@@ -71,6 +71,15 @@ type Subping struct {
 	// pinger is the ping implementation (real or mock)
 	pinger ping.Pinger
 
+	// progressCallback is called to report progress during scanning
+	progressCallback func(current, total int, currentIP string, onlineCount int)
+
+	// completedCount tracks the number of hosts that have been scanned
+	completedCount int
+
+	// onlineCount tracks the number of hosts that are online
+	onlineCount int
+
 	logger *logrus.Logger
 }
 
@@ -93,6 +102,9 @@ type Options struct {
 
 	// MaxWorkers specifies the maximum number of concurrent workers to use.
 	MaxWorkers int
+
+	// ProgressCallback is called when a host scan is completed
+	ProgressCallback func(current, total int, currentIP string, onlineCount int)
 }
 
 
@@ -138,14 +150,17 @@ func NewSubping(opts *Options) (*Subping, error) {
 	}
 
 	instance := &Subping{
-		TargetsIterator: ips,
-		Count:           opts.Count,
-		Interval:        opts.Interval,
-		Timeout:         opts.Timeout,
-		BatchSize:       int64(batchLimit),
-		MaxWorkers:      opts.MaxWorkers,
-		pinger:          ping.NewPinger(), // Auto-detect based on environment
-		logger:          logrus.New(),
+		TargetsIterator:   ips,
+		Count:             opts.Count,
+		Interval:          opts.Interval,
+		Timeout:           opts.Timeout,
+		BatchSize:         int64(batchLimit),
+		MaxWorkers:        opts.MaxWorkers,
+		pinger:            ping.NewPinger(), // Auto-detect based on environment
+		progressCallback:  opts.ProgressCallback,
+		completedCount:    0,
+		onlineCount:       0,
+		logger:            logrus.New(),
 	}
 
 	instance.logger.SetLevel(logLevel)
@@ -196,14 +211,17 @@ func NewSubpingWithPinger(opts *Options, pinger ping.Pinger) (*Subping, error) {
 	}
 
 	instance := &Subping{
-		TargetsIterator: ips,
-		Count:           opts.Count,
-		Interval:        opts.Interval,
-		Timeout:         opts.Timeout,
-		BatchSize:       int64(batchLimit),
-		MaxWorkers:      opts.MaxWorkers,
-		pinger:          pinger, // Use the provided pinger
-		logger:          logrus.New(),
+		TargetsIterator:   ips,
+		Count:             opts.Count,
+		Interval:          opts.Interval,
+		Timeout:           opts.Timeout,
+		BatchSize:         int64(batchLimit),
+		MaxWorkers:        opts.MaxWorkers,
+		pinger:            pinger, // Use the provided pinger
+		progressCallback:  opts.ProgressCallback,
+		completedCount:    0,
+		onlineCount:       0,
+		logger:            logrus.New(),
 	}
 
 	instance.logger.SetLevel(logLevel)
@@ -224,12 +242,15 @@ func (s *Subping) Run() {
 
 		// jobChannel to distribute tasks to workers.
 		jobChannel = make(chan string, s.MaxWorkers*2)
+
+		// progressMutex to protect progress counters
+		progressMutex sync.Mutex
 	)
 
 	// Spawn the worker goroutines.
 	for i := int64(0); i < int64(s.MaxWorkers); i++ {
 		wg.Add(1)
-		go s.startWorker(i, &wg, &syncMap, jobChannel)
+		go s.startWorker(i, &wg, &syncMap, jobChannel, &progressMutex)
 	}
 
 	s.logger.Debugf("Spawned %d workers.\n", s.MaxWorkers)
@@ -259,7 +280,7 @@ func (s *Subping) Run() {
 
 // startWorker is a worker goroutine that performs the ping task assigned to it.
 // It collects the ping results and stores them in the sync.Map.
-func (s *Subping) startWorker(id int64, wg *sync.WaitGroup, sm *sync.Map, c <-chan string) {
+func (s *Subping) startWorker(id int64, wg *sync.WaitGroup, sm *sync.Map, c <-chan string, progressMutex *sync.Mutex) {
 	defer wg.Done()
 
 	for target := range c {
@@ -273,6 +294,21 @@ func (s *Subping) startWorker(id int64, wg *sync.WaitGroup, sm *sync.Map, c <-ch
 		}
 
 		sm.Store(target, p)
+
+		// Update progress counters and call callback if provided
+		progressMutex.Lock()
+		s.completedCount++
+		if p.PacketsRecv > 0 {
+			s.onlineCount++
+		}
+		currentCompleted := s.completedCount
+		currentOnline := s.onlineCount
+		progressMutex.Unlock()
+
+		// Call progress callback if provided
+		if s.progressCallback != nil {
+			s.progressCallback(currentCompleted, s.TargetsIterator.TotalHosts, target, currentOnline)
+		}
 	}
 }
 
