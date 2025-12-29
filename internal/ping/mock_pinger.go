@@ -125,12 +125,28 @@ func (p *mockPinger) calculateResult(count int, latency time.Duration, packetLos
 	// Convert packet loss from ratio to percentage
 	packetLossPercentage := packetLoss * 100.0
 
+	// Simulate min/max RTT based on average latency
+	minRtt := time.Duration(float64(latency.Nanoseconds()) * 0.8) // 80% of avg
+	maxRtt := time.Duration(float64(latency.Nanoseconds()) * 1.2) // 120% of avg
+	stdDevRtt := time.Duration(float64(latency.Nanoseconds()) * 0.1) // 10% of avg
+
+	// If no packets received, set RTT values to 0
+	if packetsRecv == 0 {
+		latency = 0
+		minRtt = 0
+		maxRtt = 0
+		stdDevRtt = 0
+	}
+
 	return Result{
 		AvgRtt:                latency,
 		PacketLoss:            packetLossPercentage,
 		PacketsSent:           count,
 		PacketsRecv:           packetsRecv,
 		PacketsRecvDuplicates: 0, // Mock doesn't simulate duplicates by default
+		MinRtt:                minRtt,
+		MaxRtt:                maxRtt,
+		StdDevRtt:             stdDevRtt,
 	}
 }
 

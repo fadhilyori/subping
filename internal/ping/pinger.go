@@ -12,6 +12,9 @@ type Result struct {
 	PacketsSent           int           // Number of packets sent
 	PacketsRecv           int           // Number of packets received
 	PacketsRecvDuplicates int           // Number of duplicate packets received
+	MinRtt                time.Duration // Minimum round-trip time
+	MaxRtt                time.Duration // Maximum round-trip time
+	StdDevRtt             time.Duration // Standard deviation of round-trip times
 }
 
 // Statistics represents the full ping statistics, compatible with pro-bing.Statistics
@@ -119,11 +122,9 @@ func RunPing(ipAddress string, count int, interval time.Duration, timeout time.D
 		PacketsRecvDuplicates: result.PacketsRecvDuplicates,
 		PacketLoss:            result.PacketLoss,
 		AvgRtt:               result.AvgRtt,
-		// Note: We don't track individual RTTs in our Result
-		// So min/max/stddev will be zero-initialized, which is acceptable for compatibility
-		MinRtt:               0,
-		MaxRtt:               0,
-		StdDevRtt:            0,
+		MinRtt:               result.MinRtt,
+		MaxRtt:               result.MaxRtt,
+		StdDevRtt:            result.StdDevRtt,
 	}
 }
 
