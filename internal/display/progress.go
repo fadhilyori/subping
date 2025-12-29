@@ -82,12 +82,6 @@ func (pt *ProgressTracker) Update(current int, currentIP string, onlineCount int
 	pt.lastUpdate = time.Now()
 
 	_ = pt.bar.Set64(int64(current))
-
-	if isCompleted {
-		elapsed := time.Since(pt.startTime)
-		rate := float64(current) / elapsed.Seconds()
-		pt.printStats(rate, 0)
-	}
 }
 
 // printStats prints additional progress statistics

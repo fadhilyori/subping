@@ -159,7 +159,12 @@ func runSubping(rootCmd *cobra.Command, args []string) {
 	elapsed := time.Since(startTime)
 	totalHostOffline := s.TargetsIterator.TotalHosts - totalHostOnline
 
-	d.ShowSummary(s.TargetsIterator.TotalHosts, totalHostOnline, totalHostOffline, elapsed)
+	var scanRate float64
+	if elapsed.Seconds() > 0 {
+		scanRate = float64(s.TargetsIterator.TotalHosts) / elapsed.Seconds()
+	}
+
+	d.ShowSummary(s.TargetsIterator.TotalHosts, totalHostOnline, totalHostOffline, elapsed, scanRate)
 }
 
 // Avoid to ping with 0.0.0.0/0

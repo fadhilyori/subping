@@ -59,7 +59,7 @@ type ProgressReporter interface {
 // ResultDisplayer handles the display of scan results and summaries
 type ResultDisplayer interface {
 	ShowResults(results []HostResult)
-	ShowSummary(totalHosts int, onlineHosts int, offlineHosts int, executionTime time.Duration)
+	ShowSummary(totalHosts int, onlineHosts int, offlineHosts int, executionTime time.Duration, rate float64)
 }
 
 // Display interface combines all display functionality for different output formats

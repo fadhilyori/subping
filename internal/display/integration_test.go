@@ -71,7 +71,7 @@ func TestDisplayPipelineIntegration(t *testing.T) {
 	display.ShowResults(results)
 
 	// Test summary display
-	display.ShowSummary(3, 2, 1, 5*time.Second)
+	display.ShowSummary(3, 2, 1, 5*time.Second, 0.6)
 }
 
 func TestProgressCallbackIntegration(t *testing.T) {
@@ -211,10 +211,10 @@ func TestErrorHandlingIntegration(t *testing.T) {
 	display.ShowResults(nil)
 
 	// Test summary with zero values
-	display.ShowSummary(0, 0, 0, 0)
+	display.ShowSummary(0, 0, 0, 0, 0)
 
 	// Test with very large execution time
-	display.ShowSummary(100, 80, 20, 3600*time.Second)
+	display.ShowSummary(100, 80, 20, 3600*time.Second, 0.0278)
 }
 
 func TestPerformanceIntegration(t *testing.T) {

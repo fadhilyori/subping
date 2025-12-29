@@ -85,7 +85,7 @@ func (td *TerminalDisplay) ShowResults(results []HostResult) {
 	td.table.Render()
 }
 
-func (td *TerminalDisplay) ShowSummary(totalHosts int, onlineHosts int, offlineHosts int, executionTime time.Duration) {
+func (td *TerminalDisplay) ShowSummary(totalHosts int, onlineHosts int, offlineHosts int, executionTime time.Duration, rate float64) {
 	var healthScore int
 	if td.config.UseEnhancedHealthScore {
 		// For enhanced scoring, we need the actual results
@@ -106,7 +106,14 @@ func (td *TerminalDisplay) ShowSummary(totalHosts int, onlineHosts int, offlineH
 		healthScore,
 		td.getHealthDescription(healthScore))
 
-	fmt.Printf("Scan completed in %s | ", executionTime.Round(time.Millisecond))
+	var rateStr string
+	if rate < 1 {
+		rateStr = fmt.Sprintf("%.1f hosts/min", rate*60)
+	} else {
+		rateStr = fmt.Sprintf("%.1f hosts/sec", rate)
+	}
+
+	fmt.Printf("Scan completed in %s (%s) | ", executionTime.Round(time.Millisecond), rateStr)
 	summaryColor.Printf("%d hosts online", onlineHosts)
 	fmt.Printf(" | %d hosts offline\n", offlineHosts)
 }
