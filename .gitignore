@@ -11,6 +11,7 @@
 *.dll
 *.so
 *.dylib
+subping
 
 # Test binary, built with `go test -c`
 *.test
@@ -136,3 +137,9 @@ fabric.properties
 
 ### Solarscanner
 .scannerwork/*
+
+### Custom agents workspace
+AGENTS.md
+CLAUDE.md
+ISSUES.md
+issue-*.md
